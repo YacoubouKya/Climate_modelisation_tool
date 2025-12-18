@@ -1,85 +1,140 @@
 """Prétraitement de base pour Data Tool Climatique.
 
-Cette première version fournit des opérations simples mais utiles pour un
-hackathon :
-- sélection des colonnes date / identifiant / variables climatiques,
-- mise en forme de la date et tri chronologique,
-- agrégation temporelle basique (par jour ou par mois).
-
-L’objectif est de fournir un pipeline minimal, facile à étendre ensuite.
+Ce module fournit des fonctionnalités de prétraitement pour l'analyse des risques climatiques,
+y compris la gestion des données géospatiales et temporelles.
 """
 
 from __future__ import annotations
 
-from typing import Literal, Optional, Tuple, Dict, List
-
+from typing import Literal, Optional, Tuple, Dict, List, Union, Any
+from pathlib import Path
+import warnings
 import numpy as np
 import pandas as pd
+import geopandas as gpd
+from datetime import datetime
 
+# Désactiver les avertissements
+warnings.filterwarnings('ignore')
 
+# Type pour la fréquence d'agrégation
 AggregationFreq = Literal["Aucune", "Jour", "Mois"]
 
-
-def parse_datetime_column(df: pd.DataFrame, date_col: str) -> pd.DataFrame:
-    """Convertit une colonne en datetime et trie le DataFrame.
-
-    Si la conversion échoue, la fonction renvoie le DataFrame d’origine.
+class DataPreprocessor:
     """
-
-    new_df = df.copy()
-    try:
-        new_df[date_col] = pd.to_datetime(new_df[date_col])
-        new_df = new_df.sort_values(date_col)
-    except Exception:
-        # On ne crash pas : le reste de l’app pourra quand même fonctionner.
-        pass
-    return new_df
-
-
-def aggregate_time_series(
-    df: pd.DataFrame,
-    date_col: str,
-    freq: AggregationFreq = "Aucune",
-    id_cols: Optional[list[str]] = None,
-) -> pd.DataFrame:
-    """Agrège des séries temporelles à une fréquence donnée.
-
-    - freq="Jour"  -> groupby par date normalisée (jour civil)
-    - freq="Mois"  -> groupby par année-mois
-    - freq="Aucune" -> renvoie df tel quel
-
-    Les colonnes numériques sont agrégées par moyenne, les autres sont gardées
-    telles quelles si possible (première valeur du groupe).
+    Classe pour le prétraitement des données climatiques et d'assurance.
     """
+    
+    def __init__(self, date_col: str = "date", id_col: str = "id"):
+        """
+        Initialise le prétraiteur de données.
+        
+        Args:
+            date_col: Nom de la colonne de date
+            id_col: Nom de la colonne d'identifiant
+        """
+        self.date_col = date_col
+        self.id_col = id_col
+    
+    def load_data(self, file_path: Union[str, Path]) -> pd.DataFrame:
+        """
+        Charge les données à partir d'un fichier CSV ou Excel.
+        
+        Args:
+            file_path: Chemin vers le fichier de données
+            
+        Returns:
+            DataFrame contenant les données chargées
+        """
+        file_path = Path(file_path)
+        if file_path.suffix == '.csv':
+            return pd.read_csv(file_path, parse_dates=[self.date_col])
+        elif file_path.suffix in ['.xlsx', '.xls']:
+            return pd.read_excel(file_path, parse_dates=[self.date_col])
+        else:
+            raise ValueError("Format de fichier non pris en charge. Utilisez CSV ou Excel.")
+    
+    def handle_missing_values(
+        self, 
+        df: pd.DataFrame, 
+        method: str = "drop", 
+        fill_value: Optional[Any] = None
+    ) -> pd.DataFrame:
+        """
+        Gère les valeurs manquantes dans le DataFrame.
+        
+        Args:
+            df: DataFrame d'entrée
+            method: Méthode de traitement ('drop' pour supprimer, 'fill' pour remplacer)
+            fill_value: Valeur de remplacement si method='fill'
+            
+        Returns:
+            DataFrame avec les valeurs manquantes traitées
+        """
+        if method == "drop":
+            return df.dropna()
+        elif method == "fill":
+            return df.fillna(fill_value)
+        else:
+            raise ValueError("Méthode non reconnue. Utilisez 'drop' ou 'fill'.")
+    
+    def aggregate_by_frequency(
+        self, 
+        df: pd.DataFrame, 
+        freq: AggregationFreq = "Mois",
+        id_cols: Optional[List[str]] = None,
+        agg_func: str = "mean"
+    ) -> pd.DataFrame:
+        """
+        Agrège les données par une fréquence temporelle spécifiée.
+        
+        Args:
+            df: DataFrame d'entrée contenant une colonne de date
+            freq: Fréquence d'agrégation ('Jour', 'Mois', 'Aucune')
+            id_cols: Colonnes d'identification pour le groupement
+            agg_func: Fonction d'agrégation ('mean', 'sum', 'max', 'min')
+            
+        Returns:
+            DataFrame agrégé selon la fréquence spécifiée
+        """
+        if freq == "Aucune" or self.date_col not in df.columns:
+            return df
+        
+        new_df = df.copy()
+        new_df[self.date_col] = pd.to_datetime(new_df[self.date_col], errors="coerce")
 
-    if freq == "Aucune":
-        return df
+        if freq == "Jour":
+            new_df["_dt_group"] = new_df[self.date_col].dt.date
+        elif freq == "Mois":
+            new_df["_dt_group"] = new_df[self.date_col].dt.to_period("M").dt.to_timestamp()
+        else:
+            return df
 
-    if date_col not in df.columns:
-        return df
+        group_cols = ["_dt_group"]
+        if id_cols:
+            group_cols.extend([c for c in id_cols if c in new_df.columns])
 
-    new_df = df.copy()
-    new_df[date_col] = pd.to_datetime(new_df[date_col], errors="coerce")
-
-    if freq == "Jour":
-        new_df["_dt_group"] = new_df[date_col].dt.date
-    elif freq == "Mois":
-        new_df["_dt_group"] = new_df[date_col].dt.to_period("M").dt.to_timestamp()
-    else:
-        return df
-
-    group_cols = ["_dt_group"]
-    if id_cols:
-        group_cols.extend([c for c in id_cols if c in new_df.columns])
-
-    # Exclure les colonnes de groupement de l'agrégation pour éviter les doublons
-    num_cols = new_df.select_dtypes(include=["number"]).columns.tolist()
-    num_cols = [c for c in num_cols if c not in group_cols and c != "_dt_group"]
-    agg_dict = {col: "mean" for col in num_cols}
-
-    grouped = new_df.groupby(group_cols).agg(agg_dict).reset_index()
-    grouped = grouped.rename(columns={"_dt_group": date_col})
-    return grouped
+        # Exclure les colonnes de groupement de l'agrégation
+        num_cols = new_df.select_dtypes(include=["number"]).columns.tolist()
+        num_cols = [c for c in num_cols if c not in group_cols and c != "_dt_group"]
+        
+        # Créer le dictionnaire d'agrégation
+        if agg_func == "mean":
+            agg_dict = {col: "mean" for col in num_cols}
+        elif agg_func == "sum":
+            agg_dict = {col: "sum" for col in num_cols}
+        elif agg_func == "max":
+            agg_dict = {col: "max" for col in num_cols}
+        elif agg_func == "min":
+            agg_dict = {col: "min" for col in num_cols}
+        else:
+            raise ValueError("Fonction d'agrégation non reconnue. Utilisez 'mean', 'sum', 'max' ou 'min'.")
+        
+        # Grouper et agréger
+        grouped = new_df.groupby(group_cols).agg(agg_dict).reset_index()
+        grouped = grouped.rename(columns={"_dt_group": self.date_col})
+        
+        return grouped
 
 
 def add_rolling_features(
