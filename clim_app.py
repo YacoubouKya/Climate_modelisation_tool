@@ -1084,31 +1084,57 @@ def page_spatial_analysis() -> None:
     st.subheader("🗺️ Visualisation Spatiale")
     
     try:
-        # Utilisation du module clim_geospatial pour la visualisation
+        # Initialiser le processeur géospatial
+        geo_processor = clim_geospatial.GeoProcessor()
+        
+        # Créer un GeoDataFrame
+        lat_col = next((col for col in ['latitude', 'lat'] if col in df.columns), None)
+        lon_col = next((col for col in ['longitude', 'lon', 'lng'] if col in df.columns), None)
+        
+        if not lat_col or not lon_col:
+            st.error("Impossible de trouver des colonnes de coordonnées valides (latitude/longitude).")
+            return
+            
+        gdf = geo_processor.create_geodataframe(df, lat_col=lat_col, lon_col=lon_col)
+        
+        # Afficher la carte selon le type sélectionné
         if map_type == "Points":
-            clim_geospatial.plot_points_map(
-                df,
-                lat_col=geo_cols[0],
-                lon_col=geo_cols[1] if len(geo_cols) > 1 else geo_cols[0],
-                value_col=value_col,
-                title=f"Carte des {value_col}"
-            )
+            # Utiliser la méthode create_geodataframe pour créer la visualisation
+            st.map(gdf[[value_col, 'geometry']].dropna())
+            
         elif map_type == "Heatmap":
-            clim_geospatial.plot_heatmap(
-                df,
-                lat_col=geo_cols[0],
-                lon_col=geo_cols[1] if len(geo_cols) > 1 else geo_cols[0],
-                value_col=value_col,
-                title=f"Heatmap des {value_col}"
+            # Créer une heatmap avec Plotly
+            import plotly.express as px
+            
+            fig = px.density_mapbox(
+                df, 
+                lat=lat_col, 
+                lon=lon_col, 
+                z=value_col,
+                radius=10,
+                center=dict(lat=df[lat_col].mean(), lon=df[lon_col].mean()),
+                zoom=4,
+                mapbox_style="open-street-map"
             )
+            st.plotly_chart(fig, use_container_width=True)
+            
         else:  # Cluster
-            clim_geospatial.plot_cluster_map(
-                df,
-                lat_col=geo_cols[0],
-                lon_col=geo_cols[1] if len(geo_cols) > 1 else geo_cols[0],
-                value_col=value_col,
-                title=f"Clusters des {value_col}"
-            )
+            # Utiliser la méthode de clustering de GeoPandas
+            from sklearn.cluster import KMeans
+            
+            # Préparer les données pour le clustering
+            coords = gdf[['geometry']].copy()
+            coords['x'] = coords.geometry.x
+            coords['y'] = coords.geometry.y
+            
+            # Appliquer le clustering K-means
+            n_clusters = min(10, len(coords))  # Maximum 10 clusters
+            kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+            coords['cluster'] = kmeans.fit_predict(coords[['x', 'y']])
+            
+            # Afficher les clusters sur une carte
+            st.map(coords[['cluster', 'geometry']])
+            
     except Exception as e:
         st.error(f"Erreur lors de la génération de la carte : {str(e)}")
         st.exception(e)
@@ -1161,34 +1187,69 @@ def page_insurance_analysis() -> None:
     st.subheader("📈 Indicateurs Clés")
     
     try:
-        # Utilisation du module clim_insurance pour les calculs
-        if 'Prime Pure' in metrics:
-            prime_pure = clim_insurance.calculate_pure_premium(df)
-            st.metric("Prime Pure Moyenne", f"{prime_pure:.2f} €")
+        # Initialiser l'analyseur d'assurance
+        analyzer = clim_insurance.InsuranceAnalyzer()
         
-        if 'Sinistralité' in metrics:
-            loss_ratio = clim_insurance.calculate_loss_ratio(df)
-            st.metric("Taux de Sinistralité", f"{loss_ratio:.1%}")
+        # Calculer les indicateurs de risque
+        if 'Prime Pure' in metrics and 'prime' in df.columns and 'sinistre' in df.columns:
+            # Calculer la prime pure moyenne
+            avg_premium = df['prime'].mean()
+            avg_claim = df['sinistre'].mean()
+            pure_premium = avg_claim / avg_premium if avg_premium > 0 else 0
+            
+            # Afficher les indicateurs
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Prime Moyenne", f"{avg_premium:.2f} €")
+            with col2:
+                st.metric("Sinistre Moyen", f"{avg_claim:.2f} €")
+            with col3:
+                st.metric("Ratio Sinistre/Prime", f"{pure_premium:.2%}")
         
-        # Affichage des graphiques
+        # Afficher les graphiques
         st.subheader("📊 Visualisations")
         
         # Graphique d'évolution des sinistres
-        if 'date' in df.columns:
+        if 'date' in df.columns and 'sinistre' in df.columns:
             st.write("### Évolution des sinistres")
-            fig = clim_insurance.plot_loss_evolution(df)
-            st.plotly_chart(fig, use_container_width=True)
+            
+            # Grouper par date si nécessaire
+            df['date'] = pd.to_datetime(df['date'])
+            time_series = df.set_index('date')['sinistre'].resample('M').sum().reset_index()
+            
+            # Créer le graphique avec Altair
+            import altair as alt
+            
+            chart = alt.Chart(time_series).mark_line().encode(
+                x='date:T',
+                y='sinistre:Q',
+                tooltip=['date:T', 'sinistre:Q']
+            ).properties(
+                width=800,
+                height=400
+            )
+            st.altair_chart(chart, use_container_width=True)
         
         # Distribution des coûts
-        st.write("### Distribution des coûts")
-        fig = clim_insurance.plot_loss_distribution(df)
-        st.plotly_chart(fig, use_container_width=True)
+        if 'cout' in df.columns:
+            st.write("### Distribution des coûts")
+            
+            # Créer l'histogramme avec Altair
+            hist = alt.Chart(df).mark_bar().encode(
+                alt.X("cout:Q", bin=True, title="Coût"),
+                y='count()',
+                tooltip=['count()', 'cout:Q']
+            ).properties(
+                width=800,
+                height=400
+            )
+            st.altair_chart(hist, use_container_width=True)
         
     except Exception as e:
         st.error(f"Erreur lors de l'analyse actuarielle : {str(e)}")
         st.exception(e)
 
-def page_reporting() -> None:
+# ... (code non modifié)
     st.header("📝 Reporting Climat")
     clim_reporting.show_reporting_summary(st.session_state)
 
