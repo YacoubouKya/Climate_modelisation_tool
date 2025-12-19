@@ -440,40 +440,86 @@ def add_reference_anomaly_features(
     reference_start: str,
     reference_end: str,
 ) -> pd.DataFrame:
-    """Calcule les anomalies par rapport à une période de référence climatologique.
+    """Calcule les anomalies par rapport à une période de référence climatique.
     
     Exemple : écart à la moyenne 1990-2020 pour chaque mois de l'année.
+    
+    Args:
+        df: DataFrame contenant les données
+        date_col: Nom de la colonne de date
+        value_cols: Liste des colonnes pour lesquelles calculer les anomalies
+        reference_start: Date de début de la période de référence (format 'YYYY-MM-DD')
+        reference_end: Date de fin de la période de référence (format 'YYYY-MM-DD')
+        
+    Returns:
+        DataFrame avec les colonnes d'anomalies ajoutées
     """
+    # Faire une copie pour éviter les effets de bord
     df_out = df.copy()
+    
+    # Vérifier si la colonne de date existe
+    if date_col not in df_out.columns:
+        import streamlit as st
+        st.error(f"La colonne de date '{date_col}' est introuvable dans les données")
+        return df_out
+    
+    # S'assurer que la colonne de date est au format datetime
+    if not pd.api.types.is_datetime64_any_dtype(df_out[date_col]):
+        df_out[date_col] = pd.to_datetime(df_out[date_col], errors='coerce')
+    
+    # Vérifier s'il y a des dates valides
+    if df_out[date_col].isna().all():
+        import streamlit as st
+        st.error(f"Impossible de convertir les dates dans la colonne '{date_col}'")
+        return df_out
+    
+    # Trier par date
     df_out = df_out.sort_values(date_col)
     
     # Extraire le mois pour calculer les moyennes de référence par mois
-    df_out["_month"] = pd.to_datetime(df_out[date_col]).dt.month
+    df_out["_month"] = df_out[date_col].dt.month
     
-    # Filtrer la période de référence
-    ref_mask = (
-        (pd.to_datetime(df_out[date_col]) >= pd.to_datetime(reference_start))
-        & (pd.to_datetime(df_out[date_col]) <= pd.to_datetime(reference_end))
-    )
-    df_ref = df_out[ref_mask]
-    
-    # Calculer les moyennes mensuelles de référence
-    for col in value_cols:
-        if col not in df_out.columns:
-            continue
+    try:
+        # Convertir les dates de référence
+        ref_start = pd.to_datetime(reference_start)
+        ref_end = pd.to_datetime(reference_end)
         
-        monthly_ref = df_ref.groupby("_month")[col].mean().to_dict()
-        
-        # Calculer l'anomalie pour chaque ligne
-        df_out[f"{col}_anomaly_vs_ref"] = df_out.apply(
-            lambda row: row[col] - monthly_ref.get(row["_month"], row[col])
-            if pd.notna(row[col]) and row["_month"] in monthly_ref
-            else np.nan,
-            axis=1,
+        # Filtrer la période de référence
+        ref_mask = (
+            (df_out[date_col] >= ref_start) & 
+            (df_out[date_col] <= ref_end)
         )
-    
-    df_out = df_out.drop(columns=["_month"])
-    return df_out
+        
+        # Vérifier si des données sont disponibles pour la période de référence
+        if not ref_mask.any():
+            import streamlit as st
+            st.warning(f"Aucune donnée disponible pour la période de référence {reference_start} à {reference_end}")
+            return df_out.drop(columns=["_month"], errors='ignore')
+        
+        df_ref = df_out[ref_mask]
+        
+        # Calculer les moyennes mensuelles de référence
+        for col in value_cols:
+            if col not in df_out.columns:
+                continue
+            
+            # Calculer la moyenne mensuelle de référence
+            monthly_ref = df_ref.groupby("_month")[col].mean().to_dict()
+            
+            # Calculer l'anomalie pour chaque ligne
+            df_out[f"{col}_anomaly_vs_ref"] = df_out.apply(
+                lambda row: row[col] - monthly_ref.get(row["_month"], np.nan)
+                if pd.notna(row[col]) and row["_month"] in monthly_ref
+                else np.nan,
+                axis=1,
+            )
+        
+        return df_out.drop(columns=["_month"], errors='ignore')
+        
+    except Exception as e:
+        import streamlit as st
+        st.error(f"Erreur lors du calcul des anomalies de référence : {str(e)}")
+        return df_out.drop(columns=["_month"], errors='ignore')
 
 
 def add_extreme_features(
