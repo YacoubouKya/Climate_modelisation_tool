@@ -285,8 +285,9 @@ def _create_precipitation_plot(df: pd.DataFrame, precip_cols: List[str]) -> Opti
     fig = go.Figure()
     
     for col in precip_df.columns:
+        x_values = df.index if isinstance(df.index, pd.DatetimeIndex) else list(range(len(df)))
         fig.add_trace(go.Bar(
-            x=df.index if isinstance(df.index, pd.DatetimeIndex) else range(len(df)),
+            x=x_values,
             y=precip_df[col],
             name=col
         ))
