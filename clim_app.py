@@ -1077,10 +1077,14 @@ def page_spatial_analysis() -> None:
     with col1:
         # Sélection de la variable à visualiser
         numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
+        if not numeric_cols:
+            st.warning("Aucune colonne numérique trouvée pour la visualisation.")
+            return
+            
         value_col = st.selectbox(
             "Variable à visualiser",
             options=numeric_cols,
-            index=0 if not numeric_cols else numeric_cols[0]
+            index=0  # Toujours 0 car on a vérifié que la liste n'est pas vide
         )
     
     with col2:
