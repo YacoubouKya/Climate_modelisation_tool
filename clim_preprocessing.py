@@ -87,7 +87,7 @@ def aggregate_time_series(
     
     Args:
         df: DataFrame contenant les données
-        date_col: Nom de la colonne de date
+        date_col: Nom de la colonne de date (peut être le nom de l'index)
         freq: Fréquence d'agrégation ("Jour", "Mois", etc.)
         id_cols: Colonnes d'identification pour le groupement
         agg_func: Fonction d'agrégation ('mean', 'sum', 'max', 'min')
@@ -98,6 +98,10 @@ def aggregate_time_series(
     # Faire une copie pour éviter les effets de bord
     df_agg = df.copy()
     
+    # Réinitialiser l'index si la colonne de date est l'index
+    if date_col not in df_agg.columns and date_col == df_agg.index.name:
+        df_agg = df_agg.reset_index()
+    
     # S'assurer que la colonne de date est au format datetime
     if not pd.api.types.is_datetime64_any_dtype(df_agg[date_col]):
         df_agg[date_col] = pd.to_datetime(df_agg[date_col], errors='coerce')
@@ -105,7 +109,11 @@ def aggregate_time_series(
     # Grouper par période
     if freq.lower() == "jour":
         # Agrégation quotidienne (déjà au bon niveau)
-        pass
+        # On ajoute des colonnes pour le groupement
+        df_agg['_year'] = df_agg[date_col].dt.year
+        df_agg['_month'] = df_agg[date_col].dt.month
+        df_agg['_day'] = df_agg[date_col].dt.day
+        group_cols = ['_year', '_month', '_day']
     elif freq.lower() == "mois":
         # Agrégation mensuelle
         df_agg['_year'] = df_agg[date_col].dt.year
@@ -116,7 +124,9 @@ def aggregate_time_series(
     
     # Ajouter les colonnes d'identification au groupement
     if id_cols:
-        group_cols = id_cols + group_cols if 'group_cols' in locals() else id_cols.copy()
+        # Filtrer les colonnes qui existent dans le DataFrame
+        existing_id_cols = [col for col in id_cols if col in df_agg.columns]
+        group_cols = existing_id_cols + group_cols
     
     # Fonction d'agrégation
     if agg_func == "mean":
@@ -130,28 +140,54 @@ def aggregate_time_series(
     else:
         raise ValueError("Fonction d'agrégation non reconnue. Utilisez 'mean', 'sum', 'max' ou 'min'.")
     
-    # Colonnes numériques à agréger
-    numeric_cols = df_agg.select_dtypes(include=['number']).columns.tolist()
-    if date_col in numeric_cols:
-        numeric_cols.remove(date_col)
+    # Colonnes à agréger (numériques sauf les colonnes de groupement)
+    numeric_cols = [col for col in df_agg.select_dtypes(include=['number']).columns 
+                   if col not in ['_year', '_month', '_day'] and 
+                      not (isinstance(id_cols, list) and col in id_cols)]
+    
+    # Si aucune colonne numérique n'est trouvée, essayer avec toutes les colonnes non-datetime
+    if not numeric_cols:
+        numeric_cols = [col for col in df_agg.columns 
+                       if not pd.api.types.is_datetime64_any_dtype(df_agg[col]) and
+                          col not in group_cols and
+                          col != date_col]
     
     # Créer un dictionnaire d'agrégation
     agg_dict = {col: agg_func for col in numeric_cols}
     
     # Grouper et agréger
-    if 'group_cols' in locals() and group_cols:
-        df_agg = df_agg.groupby(group_cols).agg(agg_dict).reset_index()
-        
-        # Recréer la colonne de date pour les agrégations mensuelles
-        if freq.lower() == "mois":
-            df_agg[date_col] = pd.to_datetime(
-                df_agg['_year'].astype(str) + '-' + 
-                df_agg['_month'].astype(str) + '-01'
-            )
-            df_agg = df_agg.drop(columns=['_year', '_month'])
-    
-    # Trier par date
-    df_agg = df_agg.sort_values(date_col)
+    if group_cols:
+        try:
+            # Grouper par les colonnes spécifiées
+            grouped = df_agg.groupby(group_cols, dropna=False)
+            df_agg = grouped.agg(agg_dict).reset_index()
+            
+            # Recréer la colonne de date
+            if freq.lower() == "jour":
+                df_agg[date_col] = pd.to_datetime(
+                    df_agg['_year'].astype(str) + '-' + 
+                    df_agg['_month'].astype(str).str.zfill(2) + '-' + 
+                    df_agg['_day'].astype(str).str.zfill(2)
+                )
+                df_agg = df_agg.drop(columns=['_year', '_month', '_day'])
+            elif freq.lower() == "mois":
+                df_agg[date_col] = pd.to_datetime(
+                    df_agg['_year'].astype(str) + '-' + 
+                    df_agg['_month'].astype(str).str.zfill(2) + '-01'
+                )
+                df_agg = df_agg.drop(columns=['_year', '_month'])
+            
+            # Trier par date
+            df_agg = df_agg.sort_values(date_col)
+            
+            # Remettre la date en index si c'était le cas à l'origine
+            if date_col not in df.columns and date_col == df.index.name:
+                df_agg = df_agg.set_index(date_col)
+                
+        except Exception as e:
+            import streamlit as st
+            st.error(f"Erreur lors de l'agrégation temporelle : {str(e)}")
+            return df  # Retourner les données non agrégées en cas d'erreur
     
     return df_agg
 
