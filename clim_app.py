@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Application Streamlit principale pour Data Tool Climatique.
 
 Flux fonctionnel :
@@ -23,7 +24,7 @@ Flux fonctionnel :
 - Reporting (synthèse + mini-rapport HTML)
 """
 
-from __future__ import annotations
+
 
 import pandas as pd
 import streamlit as st
@@ -1062,3 +1063,4 @@ def page_reporting() -> None:
 
 if __name__ == "__main__":  # pragma: no cover
     main()
+
