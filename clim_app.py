@@ -23,11 +23,12 @@ try:
     # Modules de base
     import clim_data_loader
     import clim_preprocessing
-    import clim_geospatial  # Nouveau module pour l'analyse spatiale
-    import clim_insurance   # Nouveau module pour l'analyse actuarielle
+    import clim_geospatial  # Package pour l'analyse spatiale
+    import clim_insurance   # Module pour l'analyse actuarielle
     import clim_modeling
     import clim_evaluation
-    from clim_geospatial import GeoProcessor, create_map, run_maps_page, detect_lat_lon_columns
+    from clim_geospatial.core import GeoProcessor
+    from clim_geospatial.visualization import create_map, run_maps_page, detect_lat_lon_columns
     import clim_visualization  # Module de visualisation avancée
     import clim_model_comparison
     from clim_data_utils import merge_dataframes
