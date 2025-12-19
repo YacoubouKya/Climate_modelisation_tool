@@ -23,19 +23,24 @@ try:
     # Modules de base
     import clim_data_loader
     import clim_preprocessing
-    #import clim_geospatial  # Package pour l'analyse spatiale
     import clim_insurance   # Module pour l'analyse actuarielle
     import clim_modeling
     import clim_evaluation
+    import clim_visualization  # Module de visualisation avancée
+    import clim_model_comparison
+    from clim_data_utils import merge_dataframes
+    
+    # Import des composants géospatiaux
     from clim_geospatial import (
         GeoProcessor,
         create_map,
         run_maps_page,
-        detect_lat_lon_columns
+        detect_lat_lon_columns,
+        show_risk_map,
+        spatial_join_hazard,
+        calculate_water_proximity,
+        add_climate_scenario
     )
-    import clim_visualization  # Module de visualisation avancée
-    import clim_model_comparison
-    from clim_data_utils import merge_dataframes
 except ImportError as e:
     st.error(f"❌ Erreur d'import des modules : {e}")
     st.stop()
@@ -1241,5 +1246,4 @@ def page_insurance_analysis() -> None:
 
 if __name__ == "__main__":  # pragma: no cover
     main()
-
 
