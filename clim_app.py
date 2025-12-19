@@ -242,7 +242,7 @@ def main() -> None:
             "Modélisation", 
             "Évaluation", 
             "Cartes", 
-            "Rapports"
+            "Reporting"
         ]
     )
 
@@ -263,7 +263,7 @@ def main() -> None:
         page_evaluation()
     elif section == "Cartes":
         page_maps()
-    elif section == "Rapports":
+    elif section == "Reporting":
         page_reporting()
 
 
@@ -1243,9 +1243,57 @@ def page_insurance_analysis() -> None:
         st.error(f"Erreur lors de l'analyse actuarielle : {str(e)}")
         st.exception(e)
 
-# ... (code non modifié)
-    st.header("📝 Reporting Climat")
-    clim_reporting.show_reporting_summary(st.session_state)
+def page_reporting() -> None:
+    """Page de génération de rapports sur les risques climatiques."""
+    st.title("📊 Reporting Climat")
+    
+    st.write("""
+    ## Générateur de rapports
+    
+    Cette section vous permet de générer des rapports détaillés sur les analyses effectuées.
+    """)
+    
+    # Vérifier si des données sont disponibles
+    if 'df' not in st.session_state:
+        st.warning("Veuillez d'abord charger des données dans l'onglet 'Chargement'.")
+        return
+    
+    # Options de rapport
+    st.subheader("Options du rapport")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        report_type = st.selectbox(
+            "Type de rapport",
+            ["Résumé exécutif", "Analyse complète", "Rapport technique"],
+            index=0
+        )
+    
+    with col2:
+        format_export = st.selectbox(
+            "Format d'export",
+            ["PDF", "HTML", "Markdown"],
+            index=0
+        )
+    
+    # Bouton de génération
+    if st.button("Générer le rapport", type="primary"):
+        with st.spinner("Génération du rapport en cours..."):
+            try:
+                # Ici, vous pourriez appeler une fonction de génération de rapport
+                # Par exemple : generate_report(report_type, format_export)
+                st.success("Rapport généré avec succès !")
+                
+                # Bouton de téléchargement (exemple avec un rapport factice)
+                st.download_button(
+                    label="Télécharger le rapport",
+                    data="Contenu du rapport généré",
+                    file_name=f"rapport_climat_{report_type.lower().replace(' ', '_')}.{format_export.lower()}",
+                    mime="application/octet-stream"
+                )
+                
+            except Exception as e:
+                st.error(f"Erreur lors de la génération du rapport : {str(e)}")
 
 
 if __name__ == "__main__":  # pragma: no cover
