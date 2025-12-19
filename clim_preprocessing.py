@@ -75,6 +75,86 @@ def parse_datetime_column(df: pd.DataFrame, date_col: str) -> pd.DataFrame:
     
     return df
 
+
+def aggregate_time_series(
+    df: pd.DataFrame,
+    date_col: str,
+    freq: str,
+    id_cols: Optional[List[str]] = None,
+    agg_func: str = "mean"
+) -> pd.DataFrame:
+    """Agrège les données temporelles selon la fréquence spécifiée.
+    
+    Args:
+        df: DataFrame contenant les données
+        date_col: Nom de la colonne de date
+        freq: Fréquence d'agrégation ("Jour", "Mois", etc.)
+        id_cols: Colonnes d'identification pour le groupement
+        agg_func: Fonction d'agrégation ('mean', 'sum', 'max', 'min')
+        
+    Returns:
+        DataFrame agrégé selon la fréquence spécifiée
+    """
+    # Faire une copie pour éviter les effets de bord
+    df_agg = df.copy()
+    
+    # S'assurer que la colonne de date est au format datetime
+    if not pd.api.types.is_datetime64_any_dtype(df_agg[date_col]):
+        df_agg[date_col] = pd.to_datetime(df_agg[date_col], errors='coerce')
+    
+    # Grouper par période
+    if freq.lower() == "jour":
+        # Agrégation quotidienne (déjà au bon niveau)
+        pass
+    elif freq.lower() == "mois":
+        # Agrégation mensuelle
+        df_agg['_year'] = df_agg[date_col].dt.year
+        df_agg['_month'] = df_agg[date_col].dt.month
+        group_cols = ['_year', '_month']
+    else:
+        raise ValueError(f"Fréquence d'agrégation non supportée : {freq}")
+    
+    # Ajouter les colonnes d'identification au groupement
+    if id_cols:
+        group_cols = id_cols + group_cols if 'group_cols' in locals() else id_cols.copy()
+    
+    # Fonction d'agrégation
+    if agg_func == "mean":
+        agg_func = 'mean'
+    elif agg_func == "sum":
+        agg_func = 'sum'
+    elif agg_func == "max":
+        agg_func = 'max'
+    elif agg_func == "min":
+        agg_func = 'min'
+    else:
+        raise ValueError("Fonction d'agrégation non reconnue. Utilisez 'mean', 'sum', 'max' ou 'min'.")
+    
+    # Colonnes numériques à agréger
+    numeric_cols = df_agg.select_dtypes(include=['number']).columns.tolist()
+    if date_col in numeric_cols:
+        numeric_cols.remove(date_col)
+    
+    # Créer un dictionnaire d'agrégation
+    agg_dict = {col: agg_func for col in numeric_cols}
+    
+    # Grouper et agréger
+    if 'group_cols' in locals() and group_cols:
+        df_agg = df_agg.groupby(group_cols).agg(agg_dict).reset_index()
+        
+        # Recréer la colonne de date pour les agrégations mensuelles
+        if freq.lower() == "mois":
+            df_agg[date_col] = pd.to_datetime(
+                df_agg['_year'].astype(str) + '-' + 
+                df_agg['_month'].astype(str) + '-01'
+            )
+            df_agg = df_agg.drop(columns=['_year', '_month'])
+    
+    # Trier par date
+    df_agg = df_agg.sort_values(date_col)
+    
+    return df_agg
+
 class DataPreprocessor:
     """
     Classe pour le prétraitement des données climatiques et d'assurance.
