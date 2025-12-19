@@ -20,6 +20,61 @@ warnings.filterwarnings('ignore')
 # Type pour la fréquence d'agrégation
 AggregationFreq = Literal["Aucune", "Jour", "Mois"]
 
+
+def parse_datetime_column(df: pd.DataFrame, date_col: str) -> pd.DataFrame:
+    """Convertit une colonne de dates en datetime et la définit comme index.
+    
+    Args:
+        df: DataFrame contenant les données
+        date_col: Nom de la colonne de date à convertir
+        
+    Returns:
+        DataFrame avec la colonne de date convertie et définie comme index
+        
+    Raises:
+        ValueError: Si la colonne n'existe pas ou ne peut pas être convertie en date
+    """
+    if date_col not in df.columns:
+        raise ValueError(f"La colonne de date '{date_col}' est introuvable dans les données")
+    
+    # Faire une copie pour éviter les effets de bord
+    df = df.copy()
+    
+    # Vérifier si la colonne est déjà au format datetime
+    if not pd.api.types.is_datetime64_any_dtype(df[date_col]):
+        try:
+            # Essayer de convertir en datetime avec plusieurs formats courants
+            df[date_col] = pd.to_datetime(
+                df[date_col], 
+                format='mixed',  # Permet de détecter automatiquement le format
+                dayfirst=True,   # Important pour les dates au format européen (JJ/MM/AAAA)
+                errors='coerce'  # Convertit les erreurs en NaT
+            )
+            
+            # Vérifier si la conversion a réussi
+            if df[date_col].isna().all():
+                raise ValueError(f"Impossible de convertir la colonne '{date_col}' en format date/heure")
+                
+            # Avertir des éventuelles valeurs manquantes après conversion
+            na_count = df[date_col].isna().sum()
+            if na_count > 0:
+                import warnings
+                warnings.warn(
+                    f"{na_count} valeurs n'ont pas pu être converties en date et ont été remplacées par des valeurs manquantes.",
+                    UserWarning
+                )
+                
+        except Exception as e:
+            raise ValueError(f"Erreur lors de la conversion de la colonne de date : {str(e)}")
+    
+    # Trier par date
+    df = df.sort_values(by=date_col)
+    
+    # Définir l'index temporel
+    df = df.set_index(date_col)
+    
+    return df
+
 class DataPreprocessor:
     """
     Classe pour le prétraitement des données climatiques et d'assurance.
@@ -338,7 +393,7 @@ def add_extreme_features(
 def basic_climate_preprocessing(
     df: pd.DataFrame,
     date_col: Optional[str] = None,
-    freq: AggregationFreq = "Aucune",
+    freq: str = "Aucune",
     id_cols: Optional[list[str]] = None,
     add_rolling: bool = False,
     rolling_cols: Optional[List[str]] = None,
@@ -347,34 +402,75 @@ def basic_climate_preprocessing(
 ) -> Tuple[pd.DataFrame, dict]:
     """Pipeline minimal de prétraitement climatique.
 
-    Renvoie :
-    - df_prep : DataFrame prétraité
-    - info : petit dictionnaire récapitulatif (utilisé pour l’affichage dans l’app)
-    """
+    Args:
+        df: DataFrame contenant les données à prétraiter
+        date_col: Nom de la colonne de date (optionnel)
+        freq: Fréquence d'agrégation ("Aucune", "Jour", "Mois")
+        id_cols: Liste des colonnes d'identification
+        add_rolling: Si True, ajoute des moyennes mobiles
+        rolling_cols: Colonnes pour le calcul des moyennes mobiles
+        detect_anomalies: Si True, détecte les anomalies
+        anomaly_cols: Colonnes à analyser pour la détection d'anomalies
 
-    info: dict = {}
+    Returns:
+        Tuple contenant:
+        - df_prep: DataFrame prétraité
+        - info: Dictionnaire récapitulatif pour l'affichage
+    """
+    import streamlit as st
+    from typing import Dict, Any
+    
+    info: Dict[str, Any] = {}
     df_prep = df.copy()
 
-    # 1) gestion de la date et agrégation
-    if date_col:
-        df_prep = parse_datetime_column(df_prep, date_col)
-        info["date_col"] = date_col
+    # 1) Gestion de la date
+    if date_col and date_col != "(aucune)":
+        try:
+            df_prep = parse_datetime_column(df_prep, date_col)
+            info["date_col"] = date_col
+            info["date_range"] = {
+                "debut": df_prep.index.min().strftime("%Y-%m-%d"),
+                "fin": df_prep.index.max().strftime("%Y-%m-%d")
+            }
+        except Exception as e:
+            st.error(f"Erreur lors du traitement des dates : {str(e)}")
+            st.warning("Le prétraitement continue sans utiliser la colonne de date.")
+            date_col = None
 
+    # 2) Agrégation temporelle
     if freq != "Aucune" and date_col:
-        df_prep = aggregate_time_series(df_prep, date_col=date_col, freq=freq, id_cols=id_cols)
-        info["freq"] = freq
+        try:
+            df_prep = aggregate_time_series(df_prep, date_col=date_col, freq=freq, id_cols=id_cols)
+            info["freq"] = freq
+        except Exception as e:
+            st.error(f"Erreur lors de l'agrégation temporelle : {str(e)}")
+            st.warning("Le prétraitement continue sans agrégation temporelle.")
 
-    # 2) features temporelles (rolling means)
-    if add_rolling and date_col:
-        df_prep = add_rolling_features(df_prep, date_col=date_col, value_cols=rolling_cols)
-        info["rolling"] = True
+    # 3) Moyennes mobiles
+    if add_rolling and date_col and rolling_cols:
+        try:
+            df_prep = add_rolling_features(df_prep, date_col=date_col, value_cols=rolling_cols)
+            info["rolling"] = True
+            info["rolling_cols"] = rolling_cols
+        except Exception as e:
+            st.error(f"Erreur lors du calcul des moyennes mobiles : {str(e)}")
+            st.warning("Le prétraitement continue sans moyennes mobiles.")
 
-    # 3) détection d’anomalies simples par z-score
+    # 4) Détection d'anomalies
     if detect_anomalies:
-        flags, summary = detect_zscore_anomalies(df_prep, value_cols=anomaly_cols)
-        # On ne concatène pas les flags au DataFrame pour éviter de polluer les features
-        # mais on stocke un résumé dans info pour l’affichage dans l’app.
-        info["anomaly_summary"] = summary
+        try:
+            flags, summary = detect_zscore_anomalies(
+                df_prep, 
+                value_cols=anomaly_cols or [col for col in df_prep.select_dtypes(include=['number']).columns 
+                                          if col != date_col]
+            )
+            info["anomaly_summary"] = summary
+            info["anomaly_columns"] = anomaly_cols
+        except Exception as e:
+            st.error(f"Erreur lors de la détection d'anomalies : {str(e)}")
+            st.warning("Le prétraitement continue sans détection d'anomalies.")
 
     info["shape"] = df_prep.shape
+    info["columns"] = df_prep.columns.tolist()
+    
     return df_prep, info
