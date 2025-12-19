@@ -10,20 +10,38 @@ Flux fonctionnel :
 - Reporting (synthèse + mini-rapport HTML)
 """
 
+"""Application Streamlit principale pour Data Tool Climatique.
+
+Flux fonctionnel :
+- Chargement des données climatiques / exposition
+- EDA rapide
+- Prétraitement de base (dates, agrégation, rolling, résumé d'anomalies)
+- Analyse spatiale et actuarielle
+- Modélisation (plusieurs modèles au choix)
+- Évaluation
+- Cartographie du risque
+- Reporting (synthèse + mini-rapport HTML)
+"""
+
 from __future__ import annotations
 
 import pandas as pd
 import streamlit as st
 import altair as alt
+from typing import Dict, Any, Optional, List, Tuple
 
 # Imports des modules avec gestion d'erreur
 try:
+    # Modules de base
     import clim_data_loader
     import clim_preprocessing
+    import clim_geospatial  # Nouveau module pour l'analyse spatiale
+    import clim_insurance   # Nouveau module pour l'analyse actuarielle
     import clim_modeling
     import clim_evaluation
     import clim_reporting
     import clim_maps
+    import clim_visualization  # Module de visualisation avancée
     import clim_model_comparison
     from clim_data_utils import merge_dataframes
 except ImportError as e:
@@ -219,32 +237,36 @@ def main() -> None:
     section = st.sidebar.radio(
         "Aller à :",
         [
-            "🎯 Cadrage du Projet",
-            "📥 Chargement",
-            "🔎 EDA Climatique",
-            "🛠️ Prétraitement Climat",
-            "🤖 Modélisation du Risque",
-            "📈 Évaluation & Scénarios",
-            "🗺️ Cartographie du Risque",
-            "📝 Reporting",
-        ],
+            "Accueil", 
+            "Chargement", 
+            "Prétraitement", 
+            "Analyse Spatiale",
+            "Analyse Actuarielle",
+            "Modélisation", 
+            "Évaluation", 
+            "Cartes", 
+            "Rapports"
+        ]
     )
 
-    if section == "🎯 Cadrage du Projet":
+    # Router vers la page sélectionnée
+    if page == "Accueil":
         page_framing()
-    elif section == "📥 Chargement":
+    elif page == "Chargement":
         page_loading()
-    elif section == "🔎 EDA Climatique":
-        page_eda()
-    elif section == "🛠️ Prétraitement Climat":
+    elif page == "Prétraitement":
         page_preprocessing()
-    elif section == "🤖 Modélisation du Risque":
+    elif page == "Analyse Spatiale":
+        page_spatial_analysis()
+    elif page == "Analyse Actuarielle":
+        page_insurance_analysis()
+    elif page == "Modélisation":
         page_modeling()
-    elif section == "📈 Évaluation & Scénarios":
+    elif page == "Évaluation":
         page_evaluation()
-    elif section == "🗺️ Cartographie du Risque":
+    elif page == "Cartes":
         page_maps()
-    else:
+    elif page == "Rapports":
         page_reporting()
 
 
