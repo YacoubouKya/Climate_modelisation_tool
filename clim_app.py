@@ -1,16 +1,3 @@
-from __future__ import annotations
-"""Application Streamlit principale pour Data Tool Climatique.
-
-Flux fonctionnel :
-- Chargement des données climatiques / exposition
-- EDA rapide
-- Prétraitement de base (dates, agrégation, rolling, résumé d'anomalies)
-- Modélisation (plusieurs modèles au choix)
-- Évaluation
-- Cartographie du risque
-- Reporting (synthèse + mini-rapport HTML)
-"""
-
 """Application Streamlit principale pour Data Tool Climatique.
 
 Flux fonctionnel :
@@ -24,7 +11,7 @@ Flux fonctionnel :
 - Reporting (synthèse + mini-rapport HTML)
 """
 
-
+from __future__ import annotations
 
 import pandas as pd
 import streamlit as st
@@ -251,23 +238,23 @@ def main() -> None:
     )
 
     # Router vers la page sélectionnée
-    if page == "Accueil":
+    if section == "Accueil":
         page_framing()
-    elif page == "Chargement":
+    elif section == "Chargement":
         page_loading()
-    elif page == "Prétraitement":
+    elif section == "Prétraitement":
         page_preprocessing()
-    elif page == "Analyse Spatiale":
+    elif section == "Analyse Spatiale":
         page_spatial_analysis()
-    elif page == "Analyse Actuarielle":
+    elif section == "Analyse Actuarielle":
         page_insurance_analysis()
-    elif page == "Modélisation":
+    elif section == "Modélisation":
         page_modeling()
-    elif page == "Évaluation":
+    elif section == "Évaluation":
         page_evaluation()
-    elif page == "Cartes":
+    elif section == "Cartes":
         page_maps()
-    elif page == "Rapports":
+    elif section == "Rapports":
         page_reporting()
 
 
@@ -1063,4 +1050,3 @@ def page_reporting() -> None:
 
 if __name__ == "__main__":  # pragma: no cover
     main()
-
