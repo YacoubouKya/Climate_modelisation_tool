@@ -23,7 +23,7 @@ try:
     # Modules de base
     import clim_data_loader
     import clim_preprocessing
-    import clim_geospatial  # Package pour l'analyse spatiale
+    #import clim_geospatial  # Package pour l'analyse spatiale
     import clim_insurance   # Module pour l'analyse actuarielle
     import clim_modeling
     import clim_evaluation
@@ -1237,3 +1237,4 @@ def page_insurance_analysis() -> None:
 
 if __name__ == "__main__":  # pragma: no cover
     main()
+
