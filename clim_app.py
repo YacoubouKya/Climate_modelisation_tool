@@ -1043,6 +1043,151 @@ def page_maps() -> None:
     clim_maps.run_maps_page(df, title="")
 
 
+def page_spatial_analysis() -> None:
+    """Page d'analyse spatiale des données climatiques."""
+    st.header("🌍 Analyse Spatiale")
+    
+    # Vérifier si des données sont disponibles
+    df = _select_data_source()
+    if df is None or df.empty:
+        st.warning("Veuillez d'abord charger des données dans l'onglet 📥 Chargement.")
+        return
+    
+    # Vérifier les colonnes géographiques
+    geo_cols = [col for col in ['latitude', 'longitude', 'lat', 'lon'] if col in df.columns]
+    if not geo_cols:
+        st.error("Aucune colonne géographique (latitude/longitude) trouvée dans les données.")
+        return
+    
+    # Configuration de l'analyse
+    st.subheader("⚙️ Paramètres de l'analyse")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Sélection de la variable à visualiser
+        numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
+        value_col = st.selectbox(
+            "Variable à visualiser",
+            options=numeric_cols,
+            index=0
+        )
+    
+    with col2:
+        # Options d'affichage
+        map_type = st.selectbox(
+            "Type de carte",
+            ["Points", "Heatmap", "Cluster"],
+            index=0
+        )
+    
+    # Affichage de la carte
+    st.subheader("🗺️ Visualisation Spatiale")
+    
+    try:
+        # Utilisation du module clim_geospatial pour la visualisation
+        if map_type == "Points":
+            clim_geospatial.plot_points_map(
+                df,
+                lat_col=geo_cols[0],
+                lon_col=geo_cols[1] if len(geo_cols) > 1 else geo_cols[0],
+                value_col=value_col,
+                title=f"Carte des {value_col}"
+            )
+        elif map_type == "Heatmap":
+            clim_geospatial.plot_heatmap(
+                df,
+                lat_col=geo_cols[0],
+                lon_col=geo_cols[1] if len(geo_cols) > 1 else geo_cols[0],
+                value_col=value_col,
+                title=f"Heatmap des {value_col}"
+            )
+        else:  # Cluster
+            clim_geospatial.plot_cluster_map(
+                df,
+                lat_col=geo_cols[0],
+                lon_col=geo_cols[1] if len(geo_cols) > 1 else geo_cols[0],
+                value_col=value_col,
+                title=f"Clusters des {value_col}"
+            )
+    except Exception as e:
+        st.error(f"Erreur lors de la génération de la carte : {str(e)}")
+        st.exception(e)
+
+def page_insurance_analysis() -> None:
+    """Page d'analyse actuarielle des risques climatiques."""
+    st.header("📊 Analyse Actuarielle")
+    
+    # Vérifier si des données sont disponibles
+    df = _select_data_source()
+    if df is None or df.empty:
+        st.warning("Veuillez d'abord charger des données dans l'onglet 📥 Chargement.")
+        return
+    
+    # Vérifier les colonnes nécessaires
+    required_cols = ['prime', 'sinistre', 'cout']
+    missing_cols = [col for col in required_cols if col not in df.columns]
+    
+    if missing_cols:
+        st.warning(f"Colonnes manquantes pour l'analyse actuarielle : {', '.join(missing_cols)}")
+        return
+    
+    # Configuration de l'analyse
+    st.subheader("⚙️ Paramètres de l'analyse")
+    
+    # Sélection des paramètres d'analyse
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Sélection de la période d'analyse
+        if 'date' in df.columns:
+            min_date = pd.to_datetime(df['date']).min()
+            max_date = pd.to_datetime(df['date']).max()
+            date_range = st.date_input(
+                "Période d'analyse",
+                value=(min_date, max_date),
+                min_value=min_date,
+                max_value=max_date
+            )
+    
+    with col2:
+        # Sélection des métriques à afficher
+        metrics = st.multiselect(
+            "Métriques à calculer",
+            options=['Prime Pure', 'Sinistralité', 'Prime Pure Moyenne', 'Taux de Fréquence'],
+            default=['Prime Pure', 'Sinistralité']
+        )
+    
+    # Calcul des indicateurs clés
+    st.subheader("📈 Indicateurs Clés")
+    
+    try:
+        # Utilisation du module clim_insurance pour les calculs
+        if 'Prime Pure' in metrics:
+            prime_pure = clim_insurance.calculate_pure_premium(df)
+            st.metric("Prime Pure Moyenne", f"{prime_pure:.2f} €")
+        
+        if 'Sinistralité' in metrics:
+            loss_ratio = clim_insurance.calculate_loss_ratio(df)
+            st.metric("Taux de Sinistralité", f"{loss_ratio:.1%}")
+        
+        # Affichage des graphiques
+        st.subheader("📊 Visualisations")
+        
+        # Graphique d'évolution des sinistres
+        if 'date' in df.columns:
+            st.write("### Évolution des sinistres")
+            fig = clim_insurance.plot_loss_evolution(df)
+            st.plotly_chart(fig, use_container_width=True)
+        
+        # Distribution des coûts
+        st.write("### Distribution des coûts")
+        fig = clim_insurance.plot_loss_distribution(df)
+        st.plotly_chart(fig, use_container_width=True)
+        
+    except Exception as e:
+        st.error(f"Erreur lors de l'analyse actuarielle : {str(e)}")
+        st.exception(e)
+
 def page_reporting() -> None:
     st.header("📝 Reporting Climat")
     clim_reporting.show_reporting_summary(st.session_state)
