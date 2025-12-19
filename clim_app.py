@@ -27,8 +27,7 @@ try:
     import clim_insurance   # Nouveau module pour l'analyse actuarielle
     import clim_modeling
     import clim_evaluation
-    import clim_reporting
-    import clim_maps
+    from clim_geospatial import GeoProcessor, create_map, run_maps_page, detect_lat_lon_columns
     import clim_visualization  # Module de visualisation avancée
     import clim_model_comparison
     from clim_data_utils import merge_dataframes
@@ -1039,8 +1038,8 @@ def page_maps() -> None:
         st.warning("Veuillez d'abord charger des données.")
         return
 
-    # Ne pas afficher de titre ici car run_maps_page le fait déjà
-    clim_maps.run_maps_page(df, title="")
+    # Utiliser la nouvelle fonction run_maps_page du module clim_geospatial
+    run_maps_page(df, title="Carte des risques climatiques")
 
 
 def page_spatial_analysis() -> None:
@@ -1053,29 +1052,31 @@ def page_spatial_analysis() -> None:
         st.warning("Veuillez d'abord charger des données dans l'onglet 📥 Chargement.")
         return
     
-    # Vérifier les colonnes géographiques
-    geo_cols = [col for col in ['latitude', 'longitude', 'lat', 'lon'] if col in df.columns]
-    if not geo_cols:
+    # Détecter automatiquement les colonnes de coordonnées
+    lat_col, lon_col = detect_lat_lon_columns(df)
+    
+    if not lat_col or not lon_col:
         st.error("Aucune colonne géographique (latitude/longitude) trouvée dans les données.")
         return
     
     # Configuration de l'analyse
     st.subheader("⚙️ Paramètres de l'analyse")
-    col1, col2 = st.columns(2)
     
+    # Sélection des colonnes
+    col1, col2 = st.columns(2)
     with col1:
         # Sélection de la variable à visualiser
         numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
         value_col = st.selectbox(
             "Variable à visualiser",
             options=numeric_cols,
-            index=0
+            index=0 if not numeric_cols else numeric_cols[0]
         )
     
     with col2:
         # Options d'affichage
         map_type = st.selectbox(
-            "Type de carte",
+            "Type de visualisation",
             ["Points", "Heatmap", "Cluster"],
             index=0
         )
@@ -1084,59 +1085,38 @@ def page_spatial_analysis() -> None:
     st.subheader("🗺️ Visualisation Spatiale")
     
     try:
-        # Initialiser le processeur géospatial
-        geo_processor = clim_geospatial.GeoProcessor()
-        
         # Créer un GeoDataFrame
-        lat_col = next((col for col in ['latitude', 'lat'] if col in df.columns), None)
-        lon_col = next((col for col in ['longitude', 'lon', 'lng'] if col in df.columns), None)
-        
-        if not lat_col or not lon_col:
-            st.error("Impossible de trouver des colonnes de coordonnées valides (latitude/longitude).")
-            return
-            
+        geo_processor = GeoProcessor()
         gdf = geo_processor.create_geodataframe(df, lat_col=lat_col, lon_col=lon_col)
         
-        # Afficher la carte selon le type sélectionné
-        if map_type == "Points":
-            # Utiliser la méthode create_geodataframe pour créer la visualisation
-            st.map(gdf[[value_col, 'geometry']].dropna())
+        # Afficher la carte avec le nouveau module
+        st.pydeck_chart(create_map(
+            gdf,
+            value_col=value_col,
+            map_type=map_type.lower()
+        ))
+        
+        # Section d'analyse avancée
+        st.subheader("🔍 Analyse Avancée")
+        
+        # Options d'analyse
+        analysis_type = st.selectbox(
+            "Type d'analyse",
+            ["Aucune", "Proximité à l'eau", "Détection de clusters", "Scénario climatique"],
+            index=0
+        )
+        
+        if analysis_type == "Proximité à l'eau":
+            st.info("Analyse de proximité à l'eau à implémenter")
             
-        elif map_type == "Heatmap":
-            # Créer une heatmap avec Plotly
-            import plotly.express as px
+        elif analysis_type == "Détection de clusters":
+            st.info("Détection de clusters à implémenter")
             
-            fig = px.density_mapbox(
-                df, 
-                lat=lat_col, 
-                lon=lon_col, 
-                z=value_col,
-                radius=10,
-                center=dict(lat=df[lat_col].mean(), lon=df[lon_col].mean()),
-                zoom=4,
-                mapbox_style="open-street-map"
-            )
-            st.plotly_chart(fig, use_container_width=True)
-            
-        else:  # Cluster
-            # Utiliser la méthode de clustering de GeoPandas
-            from sklearn.cluster import KMeans
-            
-            # Préparer les données pour le clustering
-            coords = gdf[['geometry']].copy()
-            coords['x'] = coords.geometry.x
-            coords['y'] = coords.geometry.y
-            
-            # Appliquer le clustering K-means
-            n_clusters = min(10, len(coords))  # Maximum 10 clusters
-            kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-            coords['cluster'] = kmeans.fit_predict(coords[['x', 'y']])
-            
-            # Afficher les clusters sur une carte
-            st.map(coords[['cluster', 'geometry']])
-            
+        elif analysis_type == "Scénario climatique":
+            st.info("Analyse de scénario climatique à implémenter")
+        
     except Exception as e:
-        st.error(f"Erreur lors de la génération de la carte : {str(e)}")
+        st.error(f"Erreur lors de l'analyse spatiale : {str(e)}")
         st.exception(e)
 
 def page_insurance_analysis() -> None:
