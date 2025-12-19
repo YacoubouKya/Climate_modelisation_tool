@@ -17,6 +17,7 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 from typing import Dict, Any, Optional, List, Tuple
+from datetime import datetime
 
 # Imports des modules avec gestion d'erreur
 try:
@@ -1244,56 +1245,65 @@ def page_insurance_analysis() -> None:
         st.exception(e)
 
 def page_reporting() -> None:
-    """Page de génération de rapports sur les risques climatiques."""
+    """Page de génération de rapports sur les risques climatiques.
+    
+    Cette page permet de générer des rapports détaillés en utilisant le module clim_reporting.
+    """
     st.title("📊 Reporting Climat")
-    
-    st.write("""
-    ## Générateur de rapports
-    
-    Cette section vous permet de générer des rapports détaillés sur les analyses effectuées.
-    """)
     
     # Vérifier si des données sont disponibles
     if 'df' not in st.session_state:
         st.warning("Veuillez d'abord charger des données dans l'onglet 'Chargement'.")
         return
     
-    # Options de rapport
-    st.subheader("Options du rapport")
+    # Afficher le résumé du rapport
+    st.header("Résumé du Projet")
+    clim_reporting.show_reporting_summary(st.session_state)
     
-    col1, col2 = st.columns(2)
-    with col1:
-        report_type = st.selectbox(
-            "Type de rapport",
-            ["Résumé exécutif", "Analyse complète", "Rapport technique"],
-            index=0
-        )
+    # Options de rapport avancées
+    st.header("Génération de Rapport")
     
-    with col2:
-        format_export = st.selectbox(
-            "Format d'export",
-            ["PDF", "HTML", "Markdown"],
-            index=0
-        )
+    with st.expander("Options avancées"):
+        col1, col2 = st.columns(2)
+        with col1:
+            report_type = st.selectbox(
+                "Type de rapport",
+                ["Résumé exécutif", "Analyse complète", "Rapport technique"],
+                index=0
+            )
+        
+        with col2:
+            format_export = st.selectbox(
+                "Format d'export",
+                ["HTML", "PDF", "Markdown"],
+                index=0
+            )
     
     # Bouton de génération
-    if st.button("Générer le rapport", type="primary"):
+    if st.button("Générer le rapport complet", type="primary", use_container_width=True):
         with st.spinner("Génération du rapport en cours..."):
             try:
-                # Ici, vous pourriez appeler une fonction de génération de rapport
-                # Par exemple : generate_report(report_type, format_export)
-                st.success("Rapport généré avec succès !")
-                
-                # Bouton de téléchargement (exemple avec un rapport factice)
-                st.download_button(
-                    label="Télécharger le rapport",
-                    data="Contenu du rapport généré",
-                    file_name=f"rapport_climat_{report_type.lower().replace(' ', '_')}.{format_export.lower()}",
-                    mime="application/octet-stream"
-                )
+                if format_export == "HTML":
+                    # Générer le rapport HTML
+                    report_html = clim_reporting.generate_html_report(st.session_state)
+                    
+                    # Afficher un aperçu du rapport
+                    st.success("Rapport généré avec succès !")
+                    st.components.v1.html(report_html, height=800, scrolling=True)
+                    
+                    # Bouton de téléchargement
+                    st.download_button(
+                        label="Télécharger le rapport HTML",
+                        data=report_html,
+                        file_name=f"rapport_climat_{datetime.now().strftime('%Y%m%d_%H%M')}.html",
+                        mime="text/html"
+                    )
+                else:
+                    st.warning(f"Le format {format_export} n'est pas encore implémenté. Seul le format HTML est disponible pour le moment.")
                 
             except Exception as e:
                 st.error(f"Erreur lors de la génération du rapport : {str(e)}")
+                st.exception(e)
 
 
 if __name__ == "__main__":  # pragma: no cover
