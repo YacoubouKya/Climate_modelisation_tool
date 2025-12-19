@@ -1252,9 +1252,22 @@ def page_reporting() -> None:
     st.title("📊 Reporting Climat")
     
     # Vérifier si des données sont disponibles
-    if 'df' not in st.session_state:
-        st.warning("Veuillez d'abord charger des données dans l'onglet 'Chargement'.")
-        return
+    if 'data_sources' not in st.session_state or not st.session_state['data_sources']:
+        if 'clim_data' not in st.session_state:
+            st.warning("Veuillez d'abord charger des données dans l'onglet 'Chargement'.")
+            return
+        # Si clim_data existe mais pas data_sources, on crée une entrée dans data_sources
+        st.session_state['data_sources'] = {'Climat': st.session_state['clim_data']}
+    
+    # Récupérer les données (première source disponible ou source 'Climat')
+    if 'Climat' in st.session_state['data_sources']:
+        df = st.session_state['data_sources']['Climat']
+    else:
+        # Prendre la première source disponible
+        df = next(iter(st.session_state['data_sources'].values()))
+    
+    # Stocker les données dans st.session_state pour une utilisation ultérieure
+    st.session_state['df'] = df
     
     # Afficher le résumé du rapport
     st.header("Résumé du Projet")
