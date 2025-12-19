@@ -1277,7 +1277,7 @@ def page_reporting() -> None:
     # Options de rapport avancées
     st.header("Génération de Rapport")
     
-    with st.expander("Options avancées"):
+    with st.markdown("Options avancées"):
         col1, col2 = st.columns(2)
         with col1:
             report_type = st.selectbox(
@@ -1322,4 +1322,5 @@ def page_reporting() -> None:
 
 if __name__ == "__main__":  # pragma: no cover
     main()
+
 
