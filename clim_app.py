@@ -1246,12 +1246,12 @@ def page_insurance_analysis() -> None:
         st.exception(e)
 
 def page_reporting() -> None:
-    """Page de génération de rapports sur les risques climatiques.
-    
-    Cette page permet de générer des rapports détaillés en utilisant le module clim_reporting.
     """
-    st.title("📊 Reporting Climat")
+    Page de génération de rapports sur les risques climatiques.
     
+    Cette page permet de générer des rapports détaillés avec visualisations avancées
+    en utilisant le module clim_reporting_enhanced.
+    """
     # Vérifier si des données sont disponibles
     if 'data_sources' not in st.session_state or not st.session_state['data_sources']:
         if 'clim_data' not in st.session_state:
@@ -1270,57 +1270,34 @@ def page_reporting() -> None:
     # Stocker les données dans st.session_state pour une utilisation ultérieure
     st.session_state['df'] = df
     
-    # Afficher le résumé du rapport
-    st.header("Résumé du Projet")
-    clim_reporting.show_reporting_summary(st.session_state)
-    
-    # Options de rapport avancées
-    st.header("Génération de Rapport")
-    
-    with st.markdown("Options avancées"):
-        col1, col2 = st.columns(2)
-        with col1:
-            report_type = st.selectbox(
-                "Type de rapport",
-                ["Résumé exécutif", "Analyse complète", "Rapport technique"],
-                index=0
-            )
+    # Afficher l'interface utilisateur du reporting amélioré
+    try:
+        from clim_reporting_enhanced import show_reporting_ui
+        show_reporting_ui()
+    except ImportError:
+        st.error("Le module de reporting avancé n'est pas disponible.")
+        st.warning("Assurez-vous que le fichier 'clim_reporting_enhanced.py' est présent dans le même répertoire.")
         
-        with col2:
-            format_export = st.selectbox(
-                "Format d'export",
-                ["HTML", "PDF", "Markdown"],
-                index=0
+        # Afficher une version simplifiée en cas d'erreur
+        st.title("📊 Reporting Climat")
+        st.warning("Mode de reporting basique - Le module avancé n'est pas disponible.")
+        
+        # Aperçu des données
+        st.subheader("Aperçu des données")
+        st.dataframe(df.head())
+        
+        # Options de base
+        st.subheader("Options d'export")
+        if st.button("Exporter vers CSV"):
+            csv = df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="Télécharger CSV",
+                data=csv,
+                file_name=f"donnees_climat_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv"
             )
-    
-    # Bouton de génération
-    if st.button("Générer le rapport complet", type="primary", use_container_width=True):
-        with st.spinner("Génération du rapport en cours..."):
-            try:
-                if format_export == "HTML":
-                    # Générer le rapport HTML
-                    report_html = clim_reporting.generate_html_report(st.session_state)
-                    
-                    # Afficher un aperçu du rapport
-                    st.success("Rapport généré avec succès !")
-                    st.components.v1.html(report_html, height=800, scrolling=True)
-                    
-                    # Bouton de téléchargement
-                    st.download_button(
-                        label="Télécharger le rapport HTML",
-                        data=report_html,
-                        file_name=f"rapport_climat_{datetime.now().strftime('%Y%m%d_%H%M')}.html",
-                        mime="text/html"
-                    )
-                else:
-                    st.warning(f"Le format {format_export} n'est pas encore implémenté. Seul le format HTML est disponible pour le moment.")
-                
-            except Exception as e:
-                st.error(f"Erreur lors de la génération du rapport : {str(e)}")
-                st.exception(e)
 
 
 if __name__ == "__main__":  # pragma: no cover
     main()
-
 
