@@ -244,14 +244,17 @@ def _create_temperature_plot(df: pd.DataFrame, temp_cols: List[str]) -> Optional
     temp_df = df[temp_cols].select_dtypes(include=['number'])
     if temp_df.empty:
         return None
-        
+    
+    # Préparer les données pour le tracé
+    x_values = df.index if isinstance(df.index, pd.DatetimeIndex) else list(range(len(df)))
+    
     # Créer un graphique d'évolution
     fig = go.Figure()
     
     for col in temp_df.columns:
         fig.add_trace(go.Scatter(
-            x=df.index if isinstance(df.index, pd.DatetimeIndex) else range(len(df)),
-            y=temp_df[col],
+            x=x_values,
+            y=temp_df[col].values,
             name=col,
             mode='lines+markers',
             line=dict(width=2)
@@ -536,10 +539,12 @@ def show_reporting_ui():
                 st.error(f"Erreur lors de la génération du rapport : {str(e)}")
                 st.exception(e)
     else:
-        # Afficher un aperçu des données disponibles
-        st.subheader("Aperçu des Données")
-        st.write(f"**{len(st.session_state['df'])}** lignes × **{len(st.session_state['df'].columns)}** colonnes")
-        st.dataframe(st.session_state['df'].head())
+        # Afficher uniquement les informations de base sur les données
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Nombre de lignes", f"{len(st.session_state['df']):,}")
+        with col2:
+            st.metric("Nombre de colonnes", len(st.session_state['df'].columns))
         
         # Conseils pour l'utilisateur
         st.info("ℹ️ Utilisez le panneau latéral pour générer un rapport personnalisé.")
