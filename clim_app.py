@@ -29,6 +29,7 @@ try:
     import clim_evaluation
     import clim_visualization  # Module de visualisation avancée
     import clim_model_comparison
+    import clim_reporting  # Module de génération de rapports
     from clim_data_utils import merge_dataframes
     
     # Import des composants géospatiaux
