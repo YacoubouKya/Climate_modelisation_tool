@@ -1907,25 +1907,26 @@ def generate_climate_report(session_state: Dict[str, Any], report_type: str = "c
     
     # En-tête du document
     report_date = datetime.now().strftime("%d/%m/%Y à %H:%M")
+    css_styles = _get_css_styles()
     html_parts.insert(0, f"""
     <!DOCTYPE html>
     <html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rapport Climatique - {report_title}</title>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    <style>
-        /* Styles de base pour la réactivité */
-        * {
-            -webkit-box-sizing: border-box;
-            -moz-box-sizing: border-box;
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-        
-        /* Assurer que les tableaux et graphiques sont réactifs */
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Rapport Climatique - {report_title}</title>
+        <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+        <style>
+            /* Styles de base pour la réactivité */
+            * {{
+                box-sizing: border-box;
+                -webkit-box-sizing: border-box;
+                -moz-box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }}
+            
+            /* Assurer que les tableaux et graphiques sont réactifs */
             .table-responsive {{
                 width: 100%;
                 overflow-x: auto;
@@ -1944,7 +1945,7 @@ def generate_climate_report(session_state: Dict[str, Any], report_type: str = "c
                 }}
             }}
         </style>
-        {_get_css_styles()}
+        {css_styles}
     </head>
     <body>
         <div class="container">
