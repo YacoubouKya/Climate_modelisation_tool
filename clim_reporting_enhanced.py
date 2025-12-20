@@ -1916,13 +1916,14 @@ def generate_climate_report(session_state: Dict[str, Any], report_type: str = "c
     <style>
         /* Styles de base pour la réactivité */
         * {
+            -webkit-box-sizing: border-box;
+            -moz-box-sizing: border-box;
             box-sizing: border-box;
             margin: 0;
             padding: 0;
         }
-            }}
-            
-            /* Assurer que les tableaux et graphiques sont réactifs */
+        
+        /* Assurer que les tableaux et graphiques sont réactifs */
             .table-responsive {{
                 width: 100%;
                 overflow-x: auto;
