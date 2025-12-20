@@ -35,10 +35,13 @@ def _get_css_styles() -> str:
             --secondary-color: #10b981;
             --danger-color: #ef4444;
             --warning-color: #f59e0b;
+            --info-color: #3b82f6;
             --light-bg: #f8fafc;
             --dark-bg: #0f172a;
             --text-color: #1e293b;
             --text-light: #64748b;
+            --border-color: #e2e8f0;
+            --success-color: #10b981;
         }
         
         body {
@@ -144,18 +147,97 @@ def _get_css_styles() -> str:
             flex-shrink: 0;
         }
         
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+        
         .grid-2 {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1.5rem;
-            margin: 1.5rem 0;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+        
+        @media (max-width: 1200px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
         }
         
         .plot-container {
             background: white;
-            padding: 1rem;
+            padding: 1.5rem;
             border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border: 1px solid var(--border-color);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .plot-container:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0,0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        
+        .plot-container h3 {
+            margin-top: 0;
+            color: var(--text-color);
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        /* Styles pour les tableaux */
+        .dataframe {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.9rem;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        
+        .dataframe th, .dataframe td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border: 1px solid var(--border-color);
+        }
+        
+        .dataframe th {
+            background-color: var(--primary-color);
+            color: white;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 0.5px;
+        }
+        
+        .dataframe tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+        
+        .dataframe tr:hover {
+            background-color: #f1f5f9;
+        }
+        
+        /* Styles pour les sections spéciales */
+        .model-section {
+            background-color: #f0f9ff;
+            border-left: 4px solid var(--info-color);
+        }
+        
+        .metrics-section {
+            background-color: #f0fdf4;
+            border-left: 4px solid var(--success-color);
+        }
+        
+        .trends-section {
+            background-color: #fffbeb;
+            border-left: 4px solid var(--warning-color);
         }
         
         .footer {
@@ -428,7 +510,7 @@ def generate_climate_report(session_state: Dict[str, Any], report_type: str = "c
     html_parts.append("""
     <div class="section">
         <h2 class="section-title">🔍 Analyse Détailée</h2>
-        <div class="grid-2">
+        <div class="grid-container">
     """)
     
     # Graphique des températures
@@ -437,8 +519,9 @@ def generate_climate_report(session_state: Dict[str, Any], report_type: str = "c
         temp_html = _get_plotly_figure_html(temp_fig)
         html_parts.append(f"""
         <div class="plot-container">
-            <h3>Évolution des Températures</h3>
+            <h3>📈 Évolution des Températures</h3>
             {temp_html}
+            <p class="text-muted">Évolution temporelle des températures enregistrées. Utilisez les contrôles pour zoomer et explorer les données.</p>
         </div>
         """)
     
@@ -448,8 +531,9 @@ def generate_climate_report(session_state: Dict[str, Any], report_type: str = "c
         precip_html = _get_plotly_figure_html(precip_fig)
         html_parts.append(f"""
         <div class="plot-container">
-            <h3>Précipitations</h3>
+            <h3>🌧️ Précipitations</h3>
             {precip_html}
+            <p class="text-muted">Distribution et évolution des précipitations. Les barres empilées montrent les différents types de précipitations.</p>
         </div>
         """)
     
@@ -459,26 +543,186 @@ def generate_climate_report(session_state: Dict[str, Any], report_type: str = "c
     html_parts.append("""
     <div class="section">
         <h2 class="section-title">📊 Statistiques Descriptives</h2>
+        <div class="grid-2">
     """)
     
     # Aperçu des données
-    html_parts.append("<h3>Aperçu des Données</h3>")
+    html_parts.append("""
+    <div>
+        <h3>Aperçu des Données</h3>
+        <div class="table-container">
+    """)
     html_parts.append(df.head().to_html(classes='dataframe', index=False))
+    html_parts.append("</div></div>")
     
     # Statistiques descriptives
     if not df.select_dtypes(include=['number']).empty:
-        html_parts.append("<h3>Statistiques Numériques</h3>")
+        html_parts.append("""
+        <div>
+            <h3>Statistiques Numériques</h3>
+            <div class="table-container">
+        """)
         html_parts.append(df.describe().round(2).to_html(classes='dataframe'))
+        html_parts.append("</div></div>")
+    
+    html_parts.append("</div>")  # Fin de la grille
+    
+    # Section d'analyse des tendances
+    html_parts.append("""
+    <div class="section trends-section">
+        <h2 class="section-title">📈 Analyse des Tendances</h2>
+        <p>Cette section présente les tendances temporelles et les modèles identifiés dans les données climatiques.</p>
+        <div class="grid-container">
+    """)
+    
+    # Ici, vous pouvez ajouter des graphiques de tendance ou d'autres analyses
+    if date_cols and temp_cols:
+        # Exemple de graphique de tendance des températures
+        try:
+            temp_trend_fig = px.scatter(
+                df, 
+                x=date_cols[0], 
+                y=temp_cols[0],
+                trendline="lowess",
+                title=f"Tendance des {temp_cols[0]}"
+            )
+            temp_trend_fig.update_layout(
+                xaxis_title="Date",
+                yaxis_title=temp_cols[0],
+                template="plotly_white"
+            )
+            html_parts.append(f"""
+            <div class="plot-container">
+                <h3>Tendance des Températures</h3>
+                {_get_plotly_figure_html(temp_trend_fig)}
+                <p class="text-muted">Courbe de tendance lissée avec la méthode LOWESS</p>
+            </div>
+            """)
+        except Exception as e:
+            st.warning(f"Impossible de générer le graphique de tendance : {str(e)}")
+    
+    if date_cols and precip_cols:
+        # Exemple de graphique de tendance des précipitations
+        try:
+            precip_trend_fig = px.bar(
+                df, 
+                x=date_cols[0], 
+                y=precip_cols[0],
+                title=f"Tendance des {precip_cols[0]}"
+            )
+            precip_trend_fig.update_layout(
+                xaxis_title="Date",
+                yaxis_title=precip_cols[0],
+                template="plotly_white"
+            )
+            html_parts.append(f"""
+            <div class="plot-container">
+                <h3>Tendance des Précipitations</h3>
+                {_get_plotly_figure_html(precip_trend_fig)}
+                <p class="text-muted">Évolution temporelle des précipitations</p>
+            </div>
+            """)
+        except Exception as e:
+            st.warning(f"Impossible de générer le graphique de tendance : {str(e)}")
+    
+    html_parts.append("</div></div>")  # Fin de la section des tendances
+    
+    # Section de modélisation
+    html_parts.append("""
+    <div class="section model-section">
+        <h2 class="section-title">🤖 Modélisation</h2>
+        <p>Cette section présente les résultats des modèles appliqués aux données climatiques.</p>
+        <div class="grid-2">
+    """)
+    
+    # Ici, vous pouvez ajouter des visualisations de modèles
+    html_parts.append("""
+    <div class="plot-container">
+        <h3>Modèle de Prédiction</h3>
+        <p>Les fonctionnalités de modélisation avancée seront disponibles dans une prochaine version.</p>
+    </div>
+    
+    <div class="plot-container">
+        <h3>Importance des Variables</h3>
+        <p>L'analyse d'importance des variables sera disponible après l'application d'un modèle prédictif.</p>
+    </div>
+    """)
+    
+    html_parts.append("</div></div>")  # Fin de la section de modélisation
+    
+    # Section des métriques avancées
+    html_parts.append("""
+    <div class="section metrics-section">
+        <h2 class="section-title">📐 Métriques Avancées</h2>
+        <p>Cette section présente des indicateurs avancés calculés à partir des données climatiques.</p>
+        <div class="kpi-container">
+    """)
+    
+    # Ajout de métriques avancées
+    if 'avg_temp' in analysis and 'min_temp' in analysis and 'max_temp' in analysis:
+        temp_range = analysis['max_temp'] - analysis['min_temp']
+        html_parts.append(_create_kpi_card(
+            value=f"{temp_range:.1f}°C",
+            label="Amplitude thermique",
+            icon="🌡️",
+            color="var(--danger-color)"
+        ))
+    
+    if 'avg_precip' in analysis and 'max_precip' in analysis:
+        html_parts.append(_create_kpi_card(
+            value=f"{analysis['max_precip']} mm",
+            label="Précipitations max. journalières",
+            icon="💧",
+            color="var(--primary-color)"
+        ))
+    
+    # Ajoutez d'autres métriques selon les données disponibles
+    html_parts.append(_create_kpi_card(
+        value=f"{analysis.get('num_rows', 0):,}",
+        label="Jours d'observation",
+        icon="📅",
+        color="var(--secondary-color)"
+    ))
+    
+    html_parts.append("</div></div>")  # Fin de la section des métriques
+    
+    # Section d'informations sur les données
+    html_parts.append("""
+    <div class="section">
+        <h2 class="section-title">ℹ️ Informations sur les Données</h2>
+        <h3>Types de Données</h3>
+    """)
     
     # Informations sur les types de données
-    html_parts.append("<h3>Types de Données</h3>")
     type_info = pd.DataFrame({
         'Colonne': df.columns,
         'Type': df.dtypes.astype(str),
         'Valeurs uniques': df.nunique(),
-        'Valeurs manquantes': df.isna().sum()
+        'Valeurs manquantes': df.isna().sum(),
+        '% Manquantes': (df.isna().sum() / len(df) * 100).round(2).astype(str) + '%'
     })
-    html_parts.append(type_info.to_html(classes='dataframe', index=False))
+    html_parts.append("""
+    <div class="table-container">
+        <style>
+            .dataframe .highlight {
+                font-weight: bold;
+                color: var(--danger-color);
+            }
+        </style>
+    """)
+    
+    # Appliquer un style pour les valeurs manquantes
+    def highlight_missing(val):
+        if '%' in str(val):
+            pct = float(str(val).replace('%', ''))
+            if pct > 10:  # Mettre en évidence les colonnes avec plus de 10% de valeurs manquantes
+                return 'highlight'
+        return ''
+    
+    # Convertir le DataFrame en HTML avec mise en forme
+    type_info_html = type_info.style.applymap(highlight_missing).to_html(classes='dataframe', index=False)
+    html_parts.append(type_info_html)
+    html_parts.append("</div>")
     
     html_parts.append("</div>")  # Fin de la section Statistiques
     
