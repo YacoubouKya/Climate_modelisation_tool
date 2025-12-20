@@ -44,6 +44,13 @@ def _get_css_styles() -> str:
             --success-color: #10b981;
         }
         
+        /* Styles de base */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
         body {
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             line-height: 1.6;
@@ -51,7 +58,80 @@ def _get_css_styles() -> str:
             background-color: #f1f5f9;
             margin: 0;
             padding: 0;
+            font-size: 16px;
+            overflow-x: hidden;
         }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border-radius: 0.5rem;
+            overflow-x: hidden;
+        }
+        
+        /* Styles pour les tableaux */
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin-bottom: 2rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .dataframe {
+            width: 100% !important;
+            margin: 0;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+            min-width: 100%;
+        }
+        
+        .dataframe th, 
+        .dataframe td {
+            padding: 0.75rem;
+            text-align: left;
+            border: 1px solid #e2e8f0;
+            white-space: nowrap;
+        }
+        
+        .dataframe th {
+            background-color: #f8fafc;
+            font-weight: 600;
+            color: #1e293b;
+            position: sticky;
+            top: 0;
+        }
+        
+        .dataframe tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+        
+        .dataframe tr:hover {
+            background-color: #f1f5f9;
+        }
+        
+        /* Styles pour les graphiques */
+        .plot-container {
+            width: 100%;
+            margin-bottom: 2rem;
+            background: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .plot-container .js-plotly-plot,
+        .plotly-graph-div {
+            width: 100% !important;
+            max-width: 100%;
+            margin: 0 auto;
+        }
+        
         
         .container {
             max-width: 1200px;
@@ -1818,13 +1898,42 @@ def generate_climate_report(session_state: Dict[str, Any], report_type: str = "c
     
     # En-tête du document
     report_date = datetime.now().strftime("%d/%m/%Y à %H:%M")
-    html_parts.append(f"""
+    html_parts.insert(0, f"""
     <!DOCTYPE html>
     <html lang="fr">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Rapport d'Analyse Climatique</title>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rapport Climatique - {report_title}</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        /* Styles de base pour la réactivité */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+            }}
+            
+            /* Assurer que les tableaux et graphiques sont réactifs */
+            .table-responsive {{
+                width: 100%;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                margin-bottom: 2rem;
+            }}
+            
+            /* Améliorer l'affichage sur mobile */
+            @media (max-width: 768px) {{
+                .container {{
+                    padding: 1rem;
+                }}
+                
+                .kpi-container, .metrics-grid, .model-grid {{
+                    grid-template-columns: 1fr !important;
+                }}
+            }}
+        </style>
         {_get_css_styles()}
     </head>
     <body>
@@ -2208,6 +2317,56 @@ def generate_climate_report(session_state: Dict[str, Any], report_type: str = "c
         <h2 class="section-title">🔮 Modélisation Avancée et Prévisions Climatiques</h2>
         <p>Cette section présente des analyses prédictives avancées et des projections climatiques basées sur les données historiques.</p>
         
+        <div class="alert alert-info" style="background-color: #e6f7ff; border-left: 4px solid #1890ff; padding: 12px; margin-bottom: 20px; border-radius: 4px;">
+            <strong>Note :</strong> Cette section utilise des données de démonstration à des fins d'illustration.
+            Pour des analyses réelles, veuillez fournir des données de modélisation complètes.
+        </div>
+        
+        <div class="table-responsive">
+            <h3>Résumé des Modèles</h3>
+            <table class="dataframe">
+                <thead>
+                    <tr>
+                        <th>Modèle</th>
+                        <th>Précision (R²)</th>
+                        <th>MAE</th>
+                        <th>RMSE</th>
+                        <th>Durée d'entraînement</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Régression Linéaire</td>
+                        <td>0.78</td>
+                        <td>2.1°C</td>
+                        <td>2.8°C</td>
+                        <td>0.5s</td>
+                    </tr>
+                    <tr>
+                        <td>Forêt Aléatoire</td>
+                        <td>0.92</td>
+                        <td>1.2°C</td>
+                        <td>1.8°C</td>
+                        <td>3.2s</td>
+                    </tr>
+                    <tr>
+                        <td>XGBoost</td>
+                        <td>0.89</td>
+                        <td>1.5°C</td>
+                        <td>2.1°C</td>
+                        <td>2.8s</td>
+                    </tr>
+                    <tr>
+                        <td>Réseau de Neurones</td>
+                        <td>0.85</td>
+                        <td>1.7°C</td>
+                        <td>2.3°C</td>
+                        <td>12.5s</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
         <div class="modeling-tabs">
             <button class="modeling-tab active" onclick="openModelingTab('model-performance')">Performance des Modèles</button>
             <button class="modeling-tab" onclick="openModelingTab('forecasts')">Prévisions</button>
@@ -2218,6 +2377,95 @@ def generate_climate_report(session_state: Dict[str, Any], report_type: str = "c
         <!-- Onglet Performance des Modèles -->
         <div id="model-performance-tab" class="modeling-tabcontent" style="display: block;">
             <h3>Évaluation des Modèles Prédictifs</h3>
+            
+            <div class="model-comparison" style="margin-bottom: 30px;">
+                <h4>Comparaison des Modèles</h4>
+                <div id="model-comparison-plot" style="width: 100%; height: 400px;"></div>
+                <div style="display: flex; justify-content: center; margin-top: 10px;">
+                    <div style="display: flex; gap: 20px;">
+                        <div><span style="display: inline-block; width: 15px; height: 15px; background-color: #3b82f6; margin-right: 5px;"></span> Modèle 1 (Random Forest)</div>
+                        <div><span style="display: inline-block; width: 15px; height: 15px; background-color: #10b981; margin-right: 5px;"></span> Modèle 2 (XGBoost)</div>
+                        <div><span style="display: inline-block; width: 15px; height: 15px; background-color: #f59e0b; margin-right: 5px;"></span> Modèle 3 (LSTM)</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="model-metrics" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 30px;">
+                <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px;">
+                    <h4 style="margin-top: 0; color: #3b82f6;">Modèle Random Forest</h4>
+                    <div style="margin-bottom: 10px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span>Précision :</span>
+                            <span style="font-weight: 500;">92%</span>
+                        </div>
+                        <div style="height: 8px; background-color: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                            <div style="width: 92%; height: 100%; background-color: #3b82f6;"></div>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span>MAE :</span>
+                            <span style="font-weight: 500;">1.2°C</span>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span>RMSE :</span>
+                            <span style="font-weight: 500;">1.8°C</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px;">
+                    <h4 style="margin-top: 0; color: #10b981;">Modèle XGBoost</h4>
+                    <div style="margin-bottom: 10px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span>Précision :</span>
+                            <span style="font-weight: 500;">89%</span>
+                        </div>
+                        <div style="height: 8px; background-color: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                            <div style="width: 89%; height: 100%; background-color: #10b981;"></div>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span>MAE :</span>
+                            <span style="font-weight: 500;">1.5°C</span>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span>RMSE :</span>
+                            <span style="font-weight: 500;">2.1°C</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px;">
+                    <h4 style="margin-top: 0; color: #f59e0b;">Modèle LSTM</h4>
+                    <div style="margin-bottom: 10px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span>Précision :</span>
+                            <span style="font-weight: 500;">86%</span>
+                        </div>
+                        <div style="height: 8px; background-color: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                            <div style="width: 86%; height: 100%; background-color: #f59e0b;"></div>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span>MAE :</span>
+                            <span style="font-weight: 500;">1.8°C</span>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span>RMSE :</span>
+                            <span style="font-weight: 500;">2.4°C</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <div class="model-grid">
                 <div class="model-metrics">
                     <h4>Métriques de Performance</h4>
@@ -2345,6 +2593,29 @@ def generate_climate_report(session_state: Dict[str, Any], report_type: str = "c
         <!-- Onglet Analyse des Variables -->
         <div id="feature-importance-tab" class="modeling-tabcontent">
             <h3>Analyse d'Importance des Variables</h3>
+            
+            <div style="margin-bottom: 30px;">
+                <h4>Importance Relative des Variables</h4>
+                <div id="feature-importance-plot" style="width: 100%; height: 500px;"></div>
+                
+                <div style="margin-top: 20px;">
+                    <h4>Interprétation des Variables Importantes</h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin-top: 15px;">
+                        <div style="border-left: 4px solid #3b82f6; padding-left: 15px;">
+                            <div style="font-weight: 600; color: #1e293b;">Température Moyenne (J-1)</div>
+                            <div style="color: #64748b; font-size: 0.9em;">La température du jour précédent est le facteur le plus important pour prédire la température actuelle.</div>
+                        </div>
+                        <div style="border-left: 4px solid #10b981; padding-left: 15px;">
+                            <div style="font-weight: 600; color: #1e293b;">Humidité Relative</div>
+                            <div style="color: #64748b; font-size: 0.9em;">L'humidité influence la température ressentie et les échanges thermiques.</div>
+                        </div>
+                        <div style="border-left: 4px solid #f59e0b; padding-left: 15px;">
+                            <div style="font-weight: 600; color: #1e293b;">Pression Atmosphérique</div>
+                            <div style="color: #64748b; font-size: 0.9em;">Les variations de pression sont liées aux changements météorologiques.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <div class="feature-analysis">
                 <div class="feature-importance-chart">
                     <!-- Graphique d'importance des variables -->
@@ -2531,6 +2802,26 @@ def generate_climate_report(session_state: Dict[str, Any], report_type: str = "c
     <div class="section metrics-section">
         <h2 class="section-title">📊 Tableau de Bord des Indicateurs Climatiques</h2>
         <p>Cette section présente une analyse approfondie des indicateurs climatiques clés et de leur évolution.</p>
+        
+        <style>
+            /* Assurer que les tableaux ne débordent pas */
+            .table-container {
+                width: 100%;
+                overflow-x: auto;
+                margin-bottom: 2rem;
+            }
+            
+            /* Améliorer l'affichage des graphiques */
+            .plotly-graph-div {
+                width: 100% !important;
+                max-width: 100%;
+            }
+            
+            /* Espacement entre les sections */
+            .metrics-section > div {
+                margin-bottom: 2.5rem;
+            }
+        </style>
         
         <div class="metrics-tabs">
             <button class="metrics-tab active" onclick="openMetricsTab('overview')">Vue d'Ensemble</button>
@@ -2800,8 +3091,10 @@ def generate_climate_report(session_state: Dict[str, Any], report_type: str = "c
     
     # Section d'informations sur les données
     html_parts.append("""
-    <div class="section">
+    <div class="section data-info">
         <h2 class="section-title">ℹ️ Informations sur les Données</h2>
+        <p>Cette section fournit des détails sur la structure et la qualité des données utilisées dans ce rapport.</p>
+        
         <h3>Types de Données</h3>
     """)
     
