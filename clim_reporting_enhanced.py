@@ -46,6 +46,8 @@ def _get_css_styles() -> str:
         
         /* Styles de base */
         * {
+            -webkit-box-sizing: border-box;
+            -moz-box-sizing: border-box;
             box-sizing: border-box;
             margin: 0;
             padding: 0;
