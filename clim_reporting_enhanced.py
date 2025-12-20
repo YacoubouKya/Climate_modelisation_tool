@@ -1692,104 +1692,132 @@ def _analyze_climate_data(df: pd.DataFrame) -> Dict[str, Any]:
     """Analyse les données climatiques et retourne des métriques clés."""
     analysis = {}
     
-    # Vérifier les colonnes numériques
-    numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
-    
-    # Détection des colonnes de température, précipitations, etc.
-    temp_cols = [col for col in df.columns if any(term in col.lower() for term in ['temp', 'tmax', 'tmin', 'tavg'])]
-    precip_cols = [col for col in df.columns if any(term in col.lower() for term in ['precip', 'rain', 'pluie'])]
-    date_cols = [col for col in df.columns if df[col].dtype == 'datetime64[ns]']
-    
-    # Calcul des métriques de base
-    analysis['num_rows'] = len(df)
-    analysis['num_cols'] = len(df.columns)
-    analysis['missing_values'] = df.isna().sum().sum()
-    analysis['missing_percent'] = (analysis['missing_values'] / (len(df) * len(df.columns)) * 100).round(2)
-    
-    # Statistiques sur les températures
-    if temp_cols:
-        temp_df = df[temp_cols].select_dtypes(include=['number'])
-        if not temp_df.empty:
-            analysis['avg_temp'] = temp_df.mean().mean().round(1)
-            analysis['temp_range'] = (temp_df.max().max() - temp_df.min().min()).round(1)
+    try:
+        # Vérifier si le DataFrame est vide
+        if df.empty:
+            analysis['error'] = "Le DataFrame fourni est vide"
+            return analysis
             
-            # Analyse des tendances de température
-            if date_cols and len(df) > 1:
-                df_sorted = df.sort_values(by=date_cols[0])
-                temp_series = temp_df.mean(axis=1)
-                x = np.arange(len(temp_series))
-                slope, _ = np.polyfit(x, temp_series, 1)
-                
-                if slope > 0.1:
-                    analysis['trend_analysis'] = f"Hausse significative des températures (+{slope:.2f}°C/an)"
-                elif slope < -0.1:
-                    analysis['trend_analysis'] = f"Baisse significative des températures ({slope:.2f}°C/an)"
-                else:
-                    analysis['trend_analysis'] = "Stabilité relative des températures"
-            else:
-                analysis['trend_analysis'] = "Données insuffisantes pour l'analyse de tendance"
-    else:
-        analysis['trend_analysis'] = "Aucune donnée de température disponible"
-    
-    # Statistiques sur les précipitations
-    if precip_cols:
-        precip_df = df[precip_cols].select_dtypes(include=['number'])
-        if not precip_df.empty:
-            analysis['avg_precip'] = precip_df.mean().mean().round(1)
-            analysis['total_precip'] = precip_df.sum().sum().round(1)
-            
-            # Détection des valeurs extrêmes
-            precip_extremes = precip_df.max()
-            analysis['max_precip'] = precip_extremes.max().round(1)
-            analysis['precip_extreme_days'] = (precip_df > 50).sum().sum()  # Jours avec plus de 50mm de pluie
-            
-            # Analyse du régime des précipitations
-            if date_cols and len(df) > 1:
-                monthly_precip = df.groupby(df[date_cols[0]].dt.month)[precip_cols].mean().mean(axis=1)
-                wettest_month = monthly_precip.idxmax()
-                driest_month = monthly_precip.idxmin()
-                
-                month_names = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", 
-                             "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
-                
-                analysis['precip_analysis'] = (
-                    f"Saison des pluies en {month_names[monthly_precip.idxmax()-1]} "
-                    f"({monthly_precip.max():.1f} mm/mois en moyenne), "
-                    f"saison sèche en {month_names[monthly_precip.idxmin()-1]}"
-                )
-            else:
-                analysis['precip_analysis'] = "Données insuffisantes pour l'analyse des précipitations"
-    else:
-        analysis['precip_analysis'] = "Aucune donnée de précipitation disponible"
+        # Vérifier les colonnes numériques
+        numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
         
-    # Analyse des risques
-    risk_factors = []
+        # Détection des colonnes de température, précipitations, etc.
+        temp_cols = [col for col in df.columns if any(term in str(col).lower() for term in ['temp', 'tmax', 'tmin', 'tavg'])]
+        precip_cols = [col for col in df.columns if any(term in str(col).lower() for term in ['precip', 'rain', 'pluie'])]
+        date_cols = [col for col in df.columns if pd.api.types.is_datetime64_any_dtype(df[col])]
+        
+        # Calcul des métriques de base
+        analysis['num_rows'] = len(df)
+        analysis['num_cols'] = len(df.columns)
+        analysis['missing_values'] = int(df.isna().sum().sum())  # Convertir en int pour la sérialisation JSON
+        analysis['missing_percent'] = (analysis['missing_values'] / (len(df) * len(df.columns)) * 100).round(2) if len(df) > 0 else 0
+        
+        # Statistiques sur les températures
+        if temp_cols:
+            try:
+                temp_df = df[temp_cols].select_dtypes(include=['number'])
+                if not temp_df.empty:
+                    analysis['avg_temp'] = float(temp_df.mean().mean().round(1))
+                    analysis['min_temp'] = float(temp_df.min().min())
+                    analysis['max_temp'] = float(temp_df.max().max())
+                    analysis['temp_range'] = float((temp_df.max().max() - temp_df.min().min()).round(1))
+                    
+                    # Analyse des tendances de température
+                    if date_cols and len(df) > 1:
+                        try:
+                            date_col = date_cols[0]
+                            df_sorted = df.sort_values(by=date_col)
+                            temp_series = temp_df.mean(axis=1)
+                            x = np.arange(len(temp_series))
+                            slope, _ = np.polyfit(x, temp_series, 1)
+                            
+                            if slope > 0.1:
+                                analysis['trend_analysis'] = f"Hausse significative des températures (+{slope:.2f}°C/an)"
+                            elif slope < -0.1:
+                                analysis['trend_analysis'] = f"Baisse significative des températures ({slope:.2f}°C/an)"
+                            else:
+                                analysis['trend_analysis'] = "Stabilité relative des températures"
+                        except Exception as e:
+                            analysis['trend_analysis'] = f"Erreur dans l'analyse de tendance: {str(e)}"
+                    else:
+                        analysis['trend_analysis'] = "Données insuffisantes pour l'analyse de tendance"
+            except Exception as e:
+                analysis['temperature_error'] = f"Erreur dans l'analyse des températures: {str(e)}"
+        else:
+            analysis['trend_analysis'] = "Aucune donnée de température disponible"
+        
+        # Statistiques sur les précipitations
+        if precip_cols:
+            try:
+                precip_df = df[precip_cols].select_dtypes(include=['number'])
+                if not precip_df.empty:
+                    analysis['avg_precip'] = float(precip_df.mean().mean().round(1))
+                    analysis['total_precip'] = float(precip_df.sum().sum().round(1))
+                    
+                    # Détection des valeurs extrêmes
+                    precip_extremes = precip_df.max()
+                    analysis['max_precip'] = float(precip_extremes.max().round(1))
+                    analysis['precip_extreme_days'] = int((precip_df > 50).sum().sum())  # Jours avec plus de 50mm de pluie
+                    
+                    # Analyse du régime des précipitations
+                    if date_cols and len(df) > 1:
+                        try:
+                            date_col = date_cols[0]
+                            monthly_precip = df.groupby(df[date_col].dt.month)[precip_cols].mean().mean(axis=1)
+                            if not monthly_precip.empty:
+                                month_names = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", 
+                                             "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
+                                
+                                analysis['precip_analysis'] = (
+                                    f"Saison des pluies en {month_names[monthly_precip.idxmax()-1]} "
+                                    f"({month_precip.max():.1f} mm/mois en moyenne), "
+                                    f"saison sèche en {month_names[monthly_precip.idxmin()-1]}"
+                                )
+                            else:
+                                analysis['precip_analysis'] = "Données mensuelles non disponibles"
+                        except Exception as e:
+                            analysis['precip_analysis'] = f"Erreur dans l'analyse des précipitations: {str(e)}"
+                    else:
+                        analysis['precip_analysis'] = "Données insuffisantes pour l'analyse des précipitations"
+            except Exception as e:
+                analysis['precipitation_error'] = f"Erreur dans l'analyse des précipitations: {str(e)}"
+        else:
+            analysis['precip_analysis'] = "Aucune donnée de précipitation disponible"
+            
+        # Analyse des risques
+        risk_factors = []
+        
+        # Vérification des vagues de chaleur
+        if 'avg_temp' in analysis and analysis['avg_temp'] > 25:
+            risk_factors.append("températures moyennes élevées")
+        
+        # Vérification des précipitations extrêmes
+        if 'precip_extreme_days' in analysis and analysis['precip_extreme_days'] > 0:
+            risk_factors.append(f"{analysis['precip_extreme_days']} jours de précipitations extrêmes")
+        
+        # Vérification des données manquantes
+        if 'missing_percent' in analysis and analysis['missing_percent'] > 5:
+            risk_factors.append(f"données manquantes ({analysis['missing_percent']}%)")
+        
+        if risk_factors:
+            analysis['risk_analysis'] = "Risques identifiés : " + ", ".join(risk_factors)
+        else:
+            analysis['risk_analysis'] = "Aucun risque majeur détecté dans les données actuelles"
+        
+        # Détection des valeurs aberrantes
+        if numeric_cols:
+            try:
+                numeric_df = df[numeric_cols]
+                q1 = numeric_df.quantile(0.25, numeric_only=True)
+                q3 = numeric_df.quantile(0.75, numeric_only=True)
+                iqr = q3 - q1
+                outliers = ((numeric_df < (q1 - 1.5 * iqr)) | (numeric_df > (q3 + 1.5 * iqr))).sum().sum()
+                analysis['outliers'] = int(outliers)  # Convertir en int pour la sérialisation
+            except Exception as e:
+                analysis['outliers_error'] = f"Erreur dans la détection des valeurs aberrantes: {str(e)}"
     
-    # Vérification des vagues de chaleur
-    if 'avg_temp' in analysis and analysis['avg_temp'] > 25:
-        risk_factors.append("températures moyennes élevées")
-    
-    # Vérification des précipitations extrêmes
-    if 'precip_extreme_days' in analysis and analysis['precip_extreme_days'] > 0:
-        risk_factors.append(f"{analysis['precip_extreme_days']} jours de précipitations extrêmes")
-    
-    # Vérification des données manquantes
-    if analysis['missing_percent'] > 5:
-        risk_factors.append(f"données manquantes ({analysis['missing_percent']}%)")
-    
-    if risk_factors:
-        analysis['risk_analysis'] = "Risques identifiés : " + ", ".join(risk_factors)
-    else:
-        analysis['risk_analysis'] = "Aucun risque majeur détecté dans les données actuelles"
-    
-    # Détection des valeurs aberrantes
-    if numeric_cols:
-        numeric_df = df[numeric_cols]
-        q1 = numeric_df.quantile(0.25)
-        q3 = numeric_df.quantile(0.75)
-        iqr = q3 - q1
-        outliers = ((numeric_df < (q1 - 1.5 * iqr)) | (numeric_df > (q3 + 1.5 * iqr))).sum().sum()
-        analysis['outliers'] = outliers
+    except Exception as e:
+        analysis['error'] = f"Erreur lors de l'analyse des données: {str(e)}"
     
     return analysis
 
@@ -2904,7 +2932,12 @@ def generate_climate_report(session_state: Dict[str, Any], report_type: str = "c
     
     # Ajout des indicateurs pluviométriques détaillés
     if precip_cols:
-        precip_stats = df[precip_cols].describe().T[['mean', 'min', 'max', 'sum']].round(1)
+        # Calculer les statistiques descriptives de base
+        precip_stats = df[precip_cols].describe().T[['mean', 'min', 'max']].round(1)
+        
+        # Ajouter la somme des précipitations
+        precip_stats['total'] = df[precip_cols].sum().round(1)
+        
         precip_stats_html = precip_stats.to_html(
             classes='metrics-table',
             float_format='{:.1f}'.format,
