@@ -1893,6 +1893,13 @@ def generate_climate_report(session_state: Dict[str, Any], report_type: str = "c
     # Détecter les colonnes de date
     date_cols = [col for col in df.columns if df[col].dtype == 'datetime64[ns]']
     
+    # Définition du titre du rapport en fonction du type
+    report_title = {
+        "complet": "Complet",
+        "executif": "Synthèse Exécutive",
+        "technique": "Analyse Technique"
+    }.get(report_type.lower(), "Climatique")
+    
     # Créer le contenu HTML
     html_parts = []
     
