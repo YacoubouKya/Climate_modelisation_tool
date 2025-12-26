@@ -228,10 +228,11 @@ def main() -> None:
         """,
         unsafe_allow_html=True,
     )
-
+    
+    st.caption("Développé par Yacoubou KOUMAI - © 2025 | v1.0.0")
     st.title("📊 Data Tool Climatique")
     st.markdown("Bienvenue dans ton outil de risque climatique interactif 🚀")
-    st.caption("Développé par Yacoubou KOUMAI - © 2025 | v1.0.0")
+   
 
     st.sidebar.title("📌 Navigation")
     section = st.sidebar.radio(
@@ -1301,6 +1302,7 @@ def page_reporting() -> None:
 
 if __name__ == "__main__":  # pragma: no cover
     main()
+
 
 
 
