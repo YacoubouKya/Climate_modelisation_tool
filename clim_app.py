@@ -53,7 +53,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
+st.caption("Développé par Yacoubou KOUMAI - © 2025 | v1.0.0")
 # Optimisations de performance
 if 'initialized' not in st.session_state:
     st.session_state['initialized'] = True
@@ -1300,4 +1300,5 @@ def page_reporting() -> None:
 
 if __name__ == "__main__":  # pragma: no cover
     main()
+
 
