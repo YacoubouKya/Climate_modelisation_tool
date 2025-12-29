@@ -1,11 +1,11 @@
-# 🌍 Data Tool Climatique
+# Data Tool Climatique
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 Outil d'analyse du risque climatique pour le hackathon, permettant le traitement, l'analyse et la modélisation de données climatiques dans un contexte d'évaluation des risques.
 
-## 🚀 Fonctionnalités
+##  Fonctionnalités
 
 - **Chargement** de données climatiques et d'exposition (stations météo, séries temporelles, événements extrêmes)
 - **Prétraitement** adapté aux données climatiques (agrégations temporelles, jointures spatiales, gestion des unités)
@@ -13,7 +13,7 @@ Outil d'analyse du risque climatique pour le hackathon, permettant le traitement
 - **Modélisation** avec comparaison de modèles adaptés aux risques climatiques
 - **Rapports** automatisés orientés décision
 
-## 📦 Installation
+## Installation
 
 1. Clonez le dépôt :
    ```bash
@@ -32,14 +32,14 @@ Outil d'analyse du risque climatique pour le hackathon, permettant le traitement
    pip install -r requirements.txt
    ```
 
-## 🛠 Utilisation
+## Utilisation
 
 Lancez l'application Streamlit :
 ```bash
 streamlit run modules/clim_app.py
 ```
 
-## 📁 Structure du projet
+##  Structure du projet
 
 ```
 data/                   # Données d'entrée
@@ -61,7 +61,7 @@ outputs/               # Sorties générées
 docs/                  # Documentation
 ```
 
-## 📊 Fonctionnalités techniques
+## Fonctionnalités techniques
 
 - **Exploration des données** : Visualisations interactives des séries temporelles et cartes
 - **Prétraitement** : Gestion des valeurs manquantes, agrégations temporelles, création de features
@@ -69,7 +69,7 @@ docs/                  # Documentation
 - **Évaluation** : Métriques adaptées au risque climatique
 - **Rapports** : Génération automatisée de rapports HTML
 
-## 🤝 Contribution
+## Contribution
 
 Les contributions sont les bienvenues ! Pour contribuer :
 
@@ -79,10 +79,11 @@ Les contributions sont les bienvenues ! Pour contribuer :
 4. Poussez vers la branche (`git push origin feature/nouvelle-fonctionnalite`)
 5. Créez une Pull Request
 
-## 📄 Licence
+##  Licence
 
 Ce projet est sous licence MIT - voir le fichier [LICENSE](LICENSE) pour plus de détails.
 
-## 📧 Contact
+##  Contact
 
 Pour toute question, veuillez ouvrir une issue sur le dépôt.
+
