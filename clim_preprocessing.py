@@ -1,311 +1,85 @@
 """Prétraitement de base pour Data Tool Climatique.
 
-Ce module fournit des fonctionnalités de prétraitement pour l'analyse des risques climatiques,
-y compris la gestion des données géospatiales et temporelles.
+Cette première version fournit des opérations simples mais utiles pour un
+hackathon :
+- sélection des colonnes date / identifiant / variables climatiques,
+- mise en forme de la date et tri chronologique,
+- agrégation temporelle basique (par jour ou par mois).
+
+L’objectif est de fournir un pipeline minimal, facile à étendre ensuite.
 """
 
 from __future__ import annotations
 
-from typing import Literal, Optional, Tuple, Dict, List, Union, Any
-from pathlib import Path
-import warnings
+from typing import Literal, Optional, Tuple, Dict, List
+
 import numpy as np
 import pandas as pd
-import geopandas as gpd
-from datetime import datetime
 
-# Désactiver les avertissements
-warnings.filterwarnings('ignore')
 
-# Type pour la fréquence d'agrégation
 AggregationFreq = Literal["Aucune", "Jour", "Mois"]
 
 
 def parse_datetime_column(df: pd.DataFrame, date_col: str) -> pd.DataFrame:
-    """Convertit une colonne de dates en datetime et la définit comme index.
-    
-    Args:
-        df: DataFrame contenant les données
-        date_col: Nom de la colonne de date à convertir
-        
-    Returns:
-        DataFrame avec la colonne de date convertie et définie comme index
-        
-    Raises:
-        ValueError: Si la colonne n'existe pas ou ne peut pas être convertie en date
+    """Convertit une colonne en datetime et trie le DataFrame.
+
+    Si la conversion échoue, la fonction renvoie le DataFrame d’origine.
     """
-    if date_col not in df.columns:
-        raise ValueError(f"La colonne de date '{date_col}' est introuvable dans les données")
-    
-    # Faire une copie pour éviter les effets de bord
-    df = df.copy()
-    
-    # Vérifier si la colonne est déjà au format datetime
-    if not pd.api.types.is_datetime64_any_dtype(df[date_col]):
-        try:
-            # Essayer de convertir en datetime avec plusieurs formats courants
-            df[date_col] = pd.to_datetime(
-                df[date_col], 
-                format='mixed',  # Permet de détecter automatiquement le format
-                dayfirst=True,   # Important pour les dates au format européen (JJ/MM/AAAA)
-                errors='coerce'  # Convertit les erreurs en NaT
-            )
-            
-            # Vérifier si la conversion a réussi
-            if df[date_col].isna().all():
-                raise ValueError(f"Impossible de convertir la colonne '{date_col}' en format date/heure")
-                
-            # Avertir des éventuelles valeurs manquantes après conversion
-            na_count = df[date_col].isna().sum()
-            if na_count > 0:
-                import warnings
-                warnings.warn(
-                    f"{na_count} valeurs n'ont pas pu être converties en date et ont été remplacées par des valeurs manquantes.",
-                    UserWarning
-                )
-                
-        except Exception as e:
-            raise ValueError(f"Erreur lors de la conversion de la colonne de date : {str(e)}")
-    
-    # Trier par date
-    df = df.sort_values(by=date_col)
-    
-    # Définir l'index temporel
-    df = df.set_index(date_col)
-    
-    return df
+
+    new_df = df.copy()
+    try:
+        new_df[date_col] = pd.to_datetime(new_df[date_col])
+        new_df = new_df.sort_values(date_col)
+    except Exception:
+        # On ne crash pas : le reste de l’app pourra quand même fonctionner.
+        pass
+    return new_df
 
 
 def aggregate_time_series(
     df: pd.DataFrame,
     date_col: str,
-    freq: str,
-    id_cols: Optional[List[str]] = None,
-    agg_func: str = "mean"
+    freq: AggregationFreq = "Aucune",
+    id_cols: Optional[list[str]] = None,
 ) -> pd.DataFrame:
-    """Agrège les données temporelles selon la fréquence spécifiée.
-    
-    Args:
-        df: DataFrame contenant les données
-        date_col: Nom de la colonne de date (peut être le nom de l'index)
-        freq: Fréquence d'agrégation ("Jour", "Mois", etc.)
-        id_cols: Colonnes d'identification pour le groupement
-        agg_func: Fonction d'agrégation ('mean', 'sum', 'max', 'min')
-        
-    Returns:
-        DataFrame agrégé selon la fréquence spécifiée
+    """Agrège des séries temporelles à une fréquence donnée.
+
+    - freq="Jour"  -> groupby par date normalisée (jour civil)
+    - freq="Mois"  -> groupby par année-mois
+    - freq="Aucune" -> renvoie df tel quel
+
+    Les colonnes numériques sont agrégées par moyenne, les autres sont gardées
+    telles quelles si possible (première valeur du groupe).
     """
-    # Faire une copie pour éviter les effets de bord
-    df_agg = df.copy()
-    
-    # Réinitialiser l'index si la colonne de date est l'index
-    if date_col not in df_agg.columns and date_col == df_agg.index.name:
-        df_agg = df_agg.reset_index()
-    
-    # S'assurer que la colonne de date est au format datetime
-    if not pd.api.types.is_datetime64_any_dtype(df_agg[date_col]):
-        df_agg[date_col] = pd.to_datetime(df_agg[date_col], errors='coerce')
-    
-    # Grouper par période
-    if freq.lower() == "jour":
-        # Agrégation quotidienne (déjà au bon niveau)
-        # On ajoute des colonnes pour le groupement
-        df_agg['_year'] = df_agg[date_col].dt.year
-        df_agg['_month'] = df_agg[date_col].dt.month
-        df_agg['_day'] = df_agg[date_col].dt.day
-        group_cols = ['_year', '_month', '_day']
-    elif freq.lower() == "mois":
-        # Agrégation mensuelle
-        df_agg['_year'] = df_agg[date_col].dt.year
-        df_agg['_month'] = df_agg[date_col].dt.month
-        group_cols = ['_year', '_month']
+
+    if freq == "Aucune":
+        return df
+
+    if date_col not in df.columns:
+        return df
+
+    new_df = df.copy()
+    new_df[date_col] = pd.to_datetime(new_df[date_col], errors="coerce")
+
+    if freq == "Jour":
+        new_df["_dt_group"] = new_df[date_col].dt.date
+    elif freq == "Mois":
+        new_df["_dt_group"] = new_df[date_col].dt.to_period("M").dt.to_timestamp()
     else:
-        raise ValueError(f"Fréquence d'agrégation non supportée : {freq}")
-    
-    # Ajouter les colonnes d'identification au groupement
+        return df
+
+    group_cols = ["_dt_group"]
     if id_cols:
-        # Filtrer les colonnes qui existent dans le DataFrame
-        existing_id_cols = [col for col in id_cols if col in df_agg.columns]
-        group_cols = existing_id_cols + group_cols
-    
-    # Fonction d'agrégation
-    if agg_func == "mean":
-        agg_func = 'mean'
-    elif agg_func == "sum":
-        agg_func = 'sum'
-    elif agg_func == "max":
-        agg_func = 'max'
-    elif agg_func == "min":
-        agg_func = 'min'
-    else:
-        raise ValueError("Fonction d'agrégation non reconnue. Utilisez 'mean', 'sum', 'max' ou 'min'.")
-    
-    # Colonnes à agréger (numériques sauf les colonnes de groupement)
-    numeric_cols = [col for col in df_agg.select_dtypes(include=['number']).columns 
-                   if col not in ['_year', '_month', '_day'] and 
-                      not (isinstance(id_cols, list) and col in id_cols)]
-    
-    # Si aucune colonne numérique n'est trouvée, essayer avec toutes les colonnes non-datetime
-    if not numeric_cols:
-        numeric_cols = [col for col in df_agg.columns 
-                       if not pd.api.types.is_datetime64_any_dtype(df_agg[col]) and
-                          col not in group_cols and
-                          col != date_col]
-    
-    # Créer un dictionnaire d'agrégation
-    agg_dict = {col: agg_func for col in numeric_cols}
-    
-    # Grouper et agréger
-    if group_cols:
-        try:
-            # Grouper par les colonnes spécifiées
-            grouped = df_agg.groupby(group_cols, dropna=False)
-            df_agg = grouped.agg(agg_dict).reset_index()
-            
-            # Recréer la colonne de date
-            if freq.lower() == "jour":
-                df_agg[date_col] = pd.to_datetime(
-                    df_agg['_year'].astype(str) + '-' + 
-                    df_agg['_month'].astype(str).str.zfill(2) + '-' + 
-                    df_agg['_day'].astype(str).str.zfill(2)
-                )
-                df_agg = df_agg.drop(columns=['_year', '_month', '_day'])
-            elif freq.lower() == "mois":
-                df_agg[date_col] = pd.to_datetime(
-                    df_agg['_year'].astype(str) + '-' + 
-                    df_agg['_month'].astype(str).str.zfill(2) + '-01'
-                )
-                df_agg = df_agg.drop(columns=['_year', '_month'])
-            
-            # Trier par date
-            df_agg = df_agg.sort_values(date_col)
-            
-            # Remettre la date en index si c'était le cas à l'origine
-            if date_col not in df.columns and date_col == df.index.name:
-                df_agg = df_agg.set_index(date_col)
-                
-        except Exception as e:
-            import streamlit as st
-            st.error(f"Erreur lors de l'agrégation temporelle : {str(e)}")
-            return df  # Retourner les données non agrégées en cas d'erreur
-    
-    return df_agg
+        group_cols.extend([c for c in id_cols if c in new_df.columns])
 
-class DataPreprocessor:
-    """
-    Classe pour le prétraitement des données climatiques et d'assurance.
-    """
-    
-    def __init__(self, date_col: str = "date", id_col: str = "id"):
-        """
-        Initialise le prétraiteur de données.
-        
-        Args:
-            date_col: Nom de la colonne de date
-            id_col: Nom de la colonne d'identifiant
-        """
-        self.date_col = date_col
-        self.id_col = id_col
-    
-    def load_data(self, file_path: Union[str, Path]) -> pd.DataFrame:
-        """
-        Charge les données à partir d'un fichier CSV ou Excel.
-        
-        Args:
-            file_path: Chemin vers le fichier de données
-            
-        Returns:
-            DataFrame contenant les données chargées
-        """
-        file_path = Path(file_path)
-        if file_path.suffix == '.csv':
-            return pd.read_csv(file_path, parse_dates=[self.date_col])
-        elif file_path.suffix in ['.xlsx', '.xls']:
-            return pd.read_excel(file_path, parse_dates=[self.date_col])
-        else:
-            raise ValueError("Format de fichier non pris en charge. Utilisez CSV ou Excel.")
-    
-    def handle_missing_values(
-        self, 
-        df: pd.DataFrame, 
-        method: str = "drop", 
-        fill_value: Optional[Any] = None
-    ) -> pd.DataFrame:
-        """
-        Gère les valeurs manquantes dans le DataFrame.
-        
-        Args:
-            df: DataFrame d'entrée
-            method: Méthode de traitement ('drop' pour supprimer, 'fill' pour remplacer)
-            fill_value: Valeur de remplacement si method='fill'
-            
-        Returns:
-            DataFrame avec les valeurs manquantes traitées
-        """
-        if method == "drop":
-            return df.dropna()
-        elif method == "fill":
-            return df.fillna(fill_value)
-        else:
-            raise ValueError("Méthode non reconnue. Utilisez 'drop' ou 'fill'.")
-    
-    def aggregate_by_frequency(
-        self, 
-        df: pd.DataFrame, 
-        freq: AggregationFreq = "Mois",
-        id_cols: Optional[List[str]] = None,
-        agg_func: str = "mean"
-    ) -> pd.DataFrame:
-        """
-        Agrège les données par une fréquence temporelle spécifiée.
-        
-        Args:
-            df: DataFrame d'entrée contenant une colonne de date
-            freq: Fréquence d'agrégation ('Jour', 'Mois', 'Aucune')
-            id_cols: Colonnes d'identification pour le groupement
-            agg_func: Fonction d'agrégation ('mean', 'sum', 'max', 'min')
-            
-        Returns:
-            DataFrame agrégé selon la fréquence spécifiée
-        """
-        if freq == "Aucune" or self.date_col not in df.columns:
-            return df
-        
-        new_df = df.copy()
-        new_df[self.date_col] = pd.to_datetime(new_df[self.date_col], errors="coerce")
+    # Exclure les colonnes de groupement de l'agrégation pour éviter les doublons
+    num_cols = new_df.select_dtypes(include=["number"]).columns.tolist()
+    num_cols = [c for c in num_cols if c not in group_cols and c != "_dt_group"]
+    agg_dict = {col: "mean" for col in num_cols}
 
-        if freq == "Jour":
-            new_df["_dt_group"] = new_df[self.date_col].dt.date
-        elif freq == "Mois":
-            new_df["_dt_group"] = new_df[self.date_col].dt.to_period("M").dt.to_timestamp()
-        else:
-            return df
-
-        group_cols = ["_dt_group"]
-        if id_cols:
-            group_cols.extend([c for c in id_cols if c in new_df.columns])
-
-        # Exclure les colonnes de groupement de l'agrégation
-        num_cols = new_df.select_dtypes(include=["number"]).columns.tolist()
-        num_cols = [c for c in num_cols if c not in group_cols and c != "_dt_group"]
-        
-        # Créer le dictionnaire d'agrégation
-        if agg_func == "mean":
-            agg_dict = {col: "mean" for col in num_cols}
-        elif agg_func == "sum":
-            agg_dict = {col: "sum" for col in num_cols}
-        elif agg_func == "max":
-            agg_dict = {col: "max" for col in num_cols}
-        elif agg_func == "min":
-            agg_dict = {col: "min" for col in num_cols}
-        else:
-            raise ValueError("Fonction d'agrégation non reconnue. Utilisez 'mean', 'sum', 'max' ou 'min'.")
-        
-        # Grouper et agréger
-        grouped = new_df.groupby(group_cols).agg(agg_dict).reset_index()
-        grouped = grouped.rename(columns={"_dt_group": self.date_col})
-        
-        return grouped
+    grouped = new_df.groupby(group_cols).agg(agg_dict).reset_index()
+    grouped = grouped.rename(columns={"_dt_group": date_col})
+    return grouped
 
 
 def add_rolling_features(
@@ -440,86 +214,40 @@ def add_reference_anomaly_features(
     reference_start: str,
     reference_end: str,
 ) -> pd.DataFrame:
-    """Calcule les anomalies par rapport à une période de référence climatique.
+    """Calcule les anomalies par rapport à une période de référence climatologique.
     
     Exemple : écart à la moyenne 1990-2020 pour chaque mois de l'année.
-    
-    Args:
-        df: DataFrame contenant les données
-        date_col: Nom de la colonne de date
-        value_cols: Liste des colonnes pour lesquelles calculer les anomalies
-        reference_start: Date de début de la période de référence (format 'YYYY-MM-DD')
-        reference_end: Date de fin de la période de référence (format 'YYYY-MM-DD')
-        
-    Returns:
-        DataFrame avec les colonnes d'anomalies ajoutées
     """
-    # Faire une copie pour éviter les effets de bord
     df_out = df.copy()
-    
-    # Vérifier si la colonne de date existe
-    if date_col not in df_out.columns:
-        import streamlit as st
-        st.error(f"La colonne de date '{date_col}' est introuvable dans les données")
-        return df_out
-    
-    # S'assurer que la colonne de date est au format datetime
-    if not pd.api.types.is_datetime64_any_dtype(df_out[date_col]):
-        df_out[date_col] = pd.to_datetime(df_out[date_col], errors='coerce')
-    
-    # Vérifier s'il y a des dates valides
-    if df_out[date_col].isna().all():
-        import streamlit as st
-        st.error(f"Impossible de convertir les dates dans la colonne '{date_col}'")
-        return df_out
-    
-    # Trier par date
     df_out = df_out.sort_values(date_col)
     
     # Extraire le mois pour calculer les moyennes de référence par mois
-    df_out["_month"] = df_out[date_col].dt.month
+    df_out["_month"] = pd.to_datetime(df_out[date_col]).dt.month
     
-    try:
-        # Convertir les dates de référence
-        ref_start = pd.to_datetime(reference_start)
-        ref_end = pd.to_datetime(reference_end)
+    # Filtrer la période de référence
+    ref_mask = (
+        (pd.to_datetime(df_out[date_col]) >= pd.to_datetime(reference_start))
+        & (pd.to_datetime(df_out[date_col]) <= pd.to_datetime(reference_end))
+    )
+    df_ref = df_out[ref_mask]
+    
+    # Calculer les moyennes mensuelles de référence
+    for col in value_cols:
+        if col not in df_out.columns:
+            continue
         
-        # Filtrer la période de référence
-        ref_mask = (
-            (df_out[date_col] >= ref_start) & 
-            (df_out[date_col] <= ref_end)
+        monthly_ref = df_ref.groupby("_month")[col].mean().to_dict()
+        
+        # Calculer l'anomalie pour chaque ligne
+        df_out[f"{col}_anomaly_vs_ref"] = df_out.apply(
+            lambda row: row[col] - monthly_ref.get(row["_month"], row[col])
+            if pd.notna(row[col]) and row["_month"] in monthly_ref
+            else np.nan,
+            axis=1,
         )
-        
-        # Vérifier si des données sont disponibles pour la période de référence
-        if not ref_mask.any():
-            import streamlit as st
-            st.warning(f"Aucune donnée disponible pour la période de référence {reference_start} à {reference_end}")
-            return df_out.drop(columns=["_month"], errors='ignore')
-        
-        df_ref = df_out[ref_mask]
-        
-        # Calculer les moyennes mensuelles de référence
-        for col in value_cols:
-            if col not in df_out.columns:
-                continue
-            
-            # Calculer la moyenne mensuelle de référence
-            monthly_ref = df_ref.groupby("_month")[col].mean().to_dict()
-            
-            # Calculer l'anomalie pour chaque ligne
-            df_out[f"{col}_anomaly_vs_ref"] = df_out.apply(
-                lambda row: row[col] - monthly_ref.get(row["_month"], np.nan)
-                if pd.notna(row[col]) and row["_month"] in monthly_ref
-                else np.nan,
-                axis=1,
-            )
-        
-        return df_out.drop(columns=["_month"], errors='ignore')
-        
-    except Exception as e:
-        import streamlit as st
-        st.error(f"Erreur lors du calcul des anomalies de référence : {str(e)}")
-        return df_out.drop(columns=["_month"], errors='ignore')
+    
+    df_out = df_out.drop(columns=["_month"])
+    return df_out
 
 
 def add_extreme_features(
@@ -555,7 +283,7 @@ def add_extreme_features(
 def basic_climate_preprocessing(
     df: pd.DataFrame,
     date_col: Optional[str] = None,
-    freq: str = "Aucune",
+    freq: AggregationFreq = "Aucune",
     id_cols: Optional[list[str]] = None,
     add_rolling: bool = False,
     rolling_cols: Optional[List[str]] = None,
@@ -564,75 +292,34 @@ def basic_climate_preprocessing(
 ) -> Tuple[pd.DataFrame, dict]:
     """Pipeline minimal de prétraitement climatique.
 
-    Args:
-        df: DataFrame contenant les données à prétraiter
-        date_col: Nom de la colonne de date (optionnel)
-        freq: Fréquence d'agrégation ("Aucune", "Jour", "Mois")
-        id_cols: Liste des colonnes d'identification
-        add_rolling: Si True, ajoute des moyennes mobiles
-        rolling_cols: Colonnes pour le calcul des moyennes mobiles
-        detect_anomalies: Si True, détecte les anomalies
-        anomaly_cols: Colonnes à analyser pour la détection d'anomalies
-
-    Returns:
-        Tuple contenant:
-        - df_prep: DataFrame prétraité
-        - info: Dictionnaire récapitulatif pour l'affichage
+    Renvoie :
+    - df_prep : DataFrame prétraité
+    - info : petit dictionnaire récapitulatif (utilisé pour l’affichage dans l’app)
     """
-    import streamlit as st
-    from typing import Dict, Any
-    
-    info: Dict[str, Any] = {}
+
+    info: dict = {}
     df_prep = df.copy()
 
-    # 1) Gestion de la date
-    if date_col and date_col != "(aucune)":
-        try:
-            df_prep = parse_datetime_column(df_prep, date_col)
-            info["date_col"] = date_col
-            info["date_range"] = {
-                "debut": df_prep.index.min().strftime("%Y-%m-%d"),
-                "fin": df_prep.index.max().strftime("%Y-%m-%d")
-            }
-        except Exception as e:
-            st.error(f"Erreur lors du traitement des dates : {str(e)}")
-            st.warning("Le prétraitement continue sans utiliser la colonne de date.")
-            date_col = None
+    # 1) gestion de la date et agrégation
+    if date_col:
+        df_prep = parse_datetime_column(df_prep, date_col)
+        info["date_col"] = date_col
 
-    # 2) Agrégation temporelle
     if freq != "Aucune" and date_col:
-        try:
-            df_prep = aggregate_time_series(df_prep, date_col=date_col, freq=freq, id_cols=id_cols)
-            info["freq"] = freq
-        except Exception as e:
-            st.error(f"Erreur lors de l'agrégation temporelle : {str(e)}")
-            st.warning("Le prétraitement continue sans agrégation temporelle.")
+        df_prep = aggregate_time_series(df_prep, date_col=date_col, freq=freq, id_cols=id_cols)
+        info["freq"] = freq
 
-    # 3) Moyennes mobiles
-    if add_rolling and date_col and rolling_cols:
-        try:
-            df_prep = add_rolling_features(df_prep, date_col=date_col, value_cols=rolling_cols)
-            info["rolling"] = True
-            info["rolling_cols"] = rolling_cols
-        except Exception as e:
-            st.error(f"Erreur lors du calcul des moyennes mobiles : {str(e)}")
-            st.warning("Le prétraitement continue sans moyennes mobiles.")
+    # 2) features temporelles (rolling means)
+    if add_rolling and date_col:
+        df_prep = add_rolling_features(df_prep, date_col=date_col, value_cols=rolling_cols)
+        info["rolling"] = True
 
-    # 4) Détection d'anomalies
+    # 3) détection d’anomalies simples par z-score
     if detect_anomalies:
-        try:
-            flags, summary = detect_zscore_anomalies(
-                df_prep, 
-                value_cols=anomaly_cols or [col for col in df_prep.select_dtypes(include=['number']).columns 
-                                          if col != date_col]
-            )
-            info["anomaly_summary"] = summary
-            info["anomaly_columns"] = anomaly_cols
-        except Exception as e:
-            st.error(f"Erreur lors de la détection d'anomalies : {str(e)}")
-            st.warning("Le prétraitement continue sans détection d'anomalies.")
+        flags, summary = detect_zscore_anomalies(df_prep, value_cols=anomaly_cols)
+        # On ne concatène pas les flags au DataFrame pour éviter de polluer les features
+        # mais on stocke un résumé dans info pour l’affichage dans l’app.
+        info["anomaly_summary"] = summary
 
     info["shape"] = df_prep.shape
-    info["columns"] = df_prep.columns.tolist()
-    
     return df_prep, info

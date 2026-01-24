@@ -324,19 +324,26 @@ def _select_data_source() -> pd.DataFrame:
         data_sources = st.session_state.get("data_sources", {})
         df_prep = st.session_state.get("clim_data_prep")
         
-        # Options disponibles
+        # Options disponibles - Ordre : Climat d'abord, Fusion en dernier
         options = []
+        
+        # 1. Ajouter les sources individuelles (Climat en priorité)
+        if data_sources:
+            # Priorité à "Climat" s'il existe
+            if "Climat" in data_sources:
+                options.append("Source : Climat")
+            # Puis les autres sources dans l'ordre
+            for label in data_sources.keys():
+                if label != "Climat":
+                    options.append(f"Source : {label}")
+        
+        # 2. Ajouter l'option de fusion (avant les données prétraitées)
+        if data_sources and len(data_sources) > 1:
+            options.append("Fusionner toutes les sources")
+        
+        # 3. Ajouter les données prétraitées en dernier
         if isinstance(df_prep, pd.DataFrame) and not df_prep.empty:
             options.append("Données prétraitées (fusionnées)")
-        
-        if data_sources:
-            if len(data_sources) > 1:
-                options.append("Fusionner toutes les sources")
-                for label in data_sources.keys():
-                    options.append(f"Source : {label}")
-            else:
-                # Une seule source
-                options.append(f"Source : {list(data_sources.keys())[0]}")
         
         if not options:
             return None
@@ -507,23 +514,9 @@ def page_eda() -> None:
 def page_preprocessing() -> None:
     st.header("🛠️ Prétraitement Climat")
     
-    # Fusionner toutes les sources de données disponibles
-    data_sources = st.session_state.get("data_sources", {})
-    
-    if data_sources:
-        # Fusionner toutes les sources
-        dfs = list(data_sources.values())
-        if len(dfs) == 1:
-            df = dfs[0]
-        if len(dfs) > 1:
-            st.info(f"Fusion de {len(dfs)} sources de données...")
-            # Utiliser la fonction centralisée de fusion
-            df = merge_dataframes(dfs)
-            st.success(f"✅ Données fusionnées : {df.shape[0]:,} lignes × {df.shape[1]} colonnes")
-    else:
-        df = st.session_state.get("clim_data")
-    
-    if df is None or df.empty:
+    # Sélection de la source (comme dans EDA)
+    df = _select_data_source()
+    if df is None:
         st.warning("Veuillez d'abord charger des données dans l'onglet 📥 Chargement.")
         return
 
@@ -1029,8 +1022,12 @@ def page_maps() -> None:
         st.warning("Veuillez d'abord charger des données.")
         return
 
+    # Récupérer les sources de données et les données prétraitées
+    data_sources = st.session_state.get("data_sources", {})
+    df_prep = st.session_state.get("clim_data_prep")
+    
     # Ne pas afficher de titre ici car run_maps_page le fait déjà
-    clim_maps.run_maps_page(df, title="")
+    clim_maps.run_maps_page(df, title="", data_sources=data_sources, df_prep=df_prep)
 
 
 def page_reporting() -> None:
