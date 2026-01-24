@@ -213,7 +213,7 @@ def main() -> None:
     )
 
     st.title(" Data Tool Climatique")
-    st.markdown("Bienvenue dans ton outil de risque climatique interactif 🚀")
+    st.markdown("Bienvenue dans ton outil de risque climatique interactif ")
 
     st.sidebar.title(" Navigation")
     section = st.sidebar.radio(
@@ -1037,4 +1037,5 @@ def page_reporting() -> None:
 
 if __name__ == "__main__":  # pragma: no cover
     main()
+
 
