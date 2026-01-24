@@ -37,10 +37,10 @@ COLOR_PALETTES = {
 
 # Fonds de carte disponibles
 TILE_LAYERS = {
-    "🌍 CartoDB Positron": "CartoDB positron",
-    "🗺️ OpenStreetMap": "OpenStreetMap",
-    "🌿 Stamen Terrain": "Stamen Terrain",
-    "📍 Stamen TonerLite": "Stamen TonerLite",
+    " CartoDB Positron": "CartoDB positron",
+    " OpenStreetMap": "OpenStreetMap",
+    " Stamen Terrain": "Stamen Terrain",
+    " Stamen TonerLite": "Stamen TonerLite",
 }
 
 
@@ -60,11 +60,11 @@ def detect_lat_lon_columns(df: pd.DataFrame) -> tuple[Optional[str], Optional[st
 def _recommend_viz_type(n_points: int) -> str:
     """Recommande le type de visualisation selon le nombre de points."""
     if n_points > 2000:
-        return "🔥 Heatmap (Climatique)"  # Seule option viable
+        return " Heatmap (Climatique)"  # Seule option viable
     elif n_points > 500:
-        return "🔥 Heatmap (Climatique)"  # Recommandée (markers trop lent)
+        return " Heatmap (Climatique)"  # Recommandée (markers trop lent)
     elif n_points > 50:
-        return "📍 Markers + Clusters"  # Bon compromis
+        return " Markers + Clusters"  # Bon compromis
     else:
         return "📍 Markers + Clusters"  # Mieux pour détail
 
@@ -171,7 +171,7 @@ def show_heatmap_folium(
                 },
             ).add_to(m)
 
-            # ⚡ Limitation intelligente : cercles seulement si < 500 points
+            #  Limitation intelligente : cercles seulement si < 500 points
             if len(map_df) < 500:
                 palette = COLOR_PALETTES["RdYlBu"]
                 colors = _get_colors_vectorized(
@@ -225,7 +225,7 @@ def show_simple_points_folium(
         )
 
         if "risk_value" in map_df.columns:
-            # ⚡ Vectorisation : calcul des couleurs une seule fois
+            #  Vectorisation : calcul des couleurs une seule fois
             palette = COLOR_PALETTES["RdYlBu"]
             colors = _get_colors_vectorized(
                 map_df["risk_value"].values,
@@ -291,7 +291,7 @@ def show_markers_folium(
         marker_cluster = MarkerCluster().add_to(m)
 
         if "risk_value" in map_df.columns and len(map_df) < 2000:
-            # ⚡ Vectorisation : calcul des couleurs une seule fois
+            #  Vectorisation : calcul des couleurs une seule fois
             palette = COLOR_PALETTES["RdYlBu"]
             colors = _get_colors_vectorized(
                 map_df["risk_value"].values,
@@ -317,7 +317,7 @@ def show_markers_folium(
                 ).add_to(marker_cluster)
         elif "risk_value" in map_df.columns:
             # Trop de points : seulement heatmap
-            st.info("⚠️ Trop de points pour markers. Utilisez l'heatmap à la place.")
+            st.info(" Trop de points pour markers. Utilisez l'heatmap à la place.")
         else:
             for idx, row in map_df.iterrows():
                 folium.Marker(
@@ -383,7 +383,7 @@ def show_gradient_3d_pydeck(
     """Affiche gradients 3D avec PyDeck (haute performance)."""
     try:
         if "risk_value" not in map_df.columns:
-            st.warning("⚠️ Aucune valeur de risque. Affichage simple.")
+            st.warning(" Aucune valeur de risque. Affichage simple.")
             
             layer = pdk.Layer(
                 "ScatterplotLayer",
@@ -482,7 +482,7 @@ def run_maps_page(
     auto_lat, auto_lon = detect_lat_lon_columns(selected_df)
 
     if not auto_lat or not auto_lon:
-        st.info("⚠️ Colonnes latitude/longitude non trouvées automatiquement. Sélectionnez-les manuellement ci-dessous.")
+        st.info(" Colonnes latitude/longitude non trouvées automatiquement. Sélectionnez-les manuellement ci-dessous.")
 
     lat_index = selected_df.columns.get_loc(auto_lat) if auto_lat and auto_lat in selected_df.columns else 0
     lon_index = selected_df.columns.get_loc(auto_lon) if auto_lon and auto_lon in selected_df.columns else (1 if len(selected_df.columns) > 1 else 0)
@@ -498,7 +498,7 @@ def run_maps_page(
             color_col = None
 
     st.markdown("---")
-    st.subheader("🎨 Options de visualisation")
+    st.subheader(" Options de visualisation")
 
     # Préparation rapide pour compter les points
     try:
@@ -506,7 +506,7 @@ def run_maps_page(
         n_points = len(temp_map_df)
         recommended_viz = _recommend_viz_type(n_points)
     except ValueError:
-        recommended_viz = "🔥 Heatmap (Climatique)"
+        recommended_viz = " Heatmap (Climatique)"
         n_points = 0
 
     col1, col2, col3 = st.columns(3)
@@ -515,13 +515,13 @@ def run_maps_page(
         viz_type = st.selectbox(
             "Type de visualisation",
             options=[
-                "🔥 Heatmap (Climatique)",
-                "� Points simples",
-                "📍 Markers + Clusters",
-                "🎯 Gradient 3D (PyDeck)",
+                " Heatmap (Climatique)",
+                " Points simples",
+                " Markers + Clusters",
+                " Gradient 3D (PyDeck)",
             ],
             index=0 if "Heatmap" in recommended_viz else (1 if "Points" in recommended_viz else (2 if "Markers" in recommended_viz else 3)),
-            help=f"⚡ Recommandé pour {n_points} points : {recommended_viz}"
+            help=f" Recommandé pour {n_points} points : {recommended_viz}"
         )
 
     with col2:
@@ -537,7 +537,7 @@ def run_maps_page(
 
     if date_cols:
         st.markdown("---")
-        st.subheader("📅 Filtre temporel (optionnel)")
+        st.subheader(" Filtre temporel (optionnel)")
         date_col_filter = st.selectbox("Colonne date pour filtrage", options=["(aucune)"] + date_cols)
 
         if date_col_filter != "(aucune)":
@@ -573,7 +573,7 @@ def run_maps_page(
     try:
         map_df = _prepare_map_data(df_filtered, lat_col, lon_col, color_col)
         elapsed = time.time() - start_time
-        st.info(f"📊 **{len(map_df)}** points • ⏱️ Préparation en **{elapsed:.2f}s**")
+        st.info(f" **{len(map_df)}** points •  Préparation en **{elapsed:.2f}s**")
     except ValueError as e:
         st.error(f"❌ {e}")
         return
@@ -584,35 +584,35 @@ def run_maps_page(
         return
 
     st.markdown("---")
-    st.subheader("🗺️ Carte")
+    st.subheader(" Carte")
 
     # Afficher selon type de visualisation
     render_start = time.time()
     folium_map = None
     
-    if viz_type == "🔥 Heatmap (Climatique)":
+    if viz_type == " Heatmap (Climatique)":
         if not FOLIUM_AVAILABLE:
             st.error("❌ Folium non installé. Installer avec : `pip install folium streamlit-folium`")
         else:
             folium_map = show_heatmap_folium(map_df, color_col, tile_layer)
 
-    elif viz_type == "🎯 Points simples":
+    elif viz_type == " Points simples":
         if not FOLIUM_AVAILABLE:
             st.error("❌ Folium non installé. Installer avec : `pip install folium streamlit-folium`")
         else:
             folium_map = show_simple_points_folium(map_df, color_col, tile_layer)
 
-    elif viz_type == "📍 Markers + Clusters":
+    elif viz_type == " Markers + Clusters":
         if not FOLIUM_AVAILABLE:
             st.error("❌ Folium non installé. Installer avec : `pip install folium streamlit-folium`")
         else:
             folium_map = show_markers_folium(map_df, color_col, tile_layer)
 
-    elif viz_type == "🎯 Gradient 3D (PyDeck)":
+    elif viz_type == " Gradient 3D (PyDeck)":
         show_gradient_3d_pydeck(map_df, color_palette)
 
     render_time = time.time() - render_start
-    st.caption(f"⏱️ Rendu en {render_time:.2f}s")
+    st.caption(f" Rendu en {render_time:.2f}s")
 
     # Boutons de téléchargement pour les cartes Folium
     if folium_map is not None:
@@ -631,7 +631,7 @@ def run_maps_page(
         with col_dl2:
             geojson_data = export_data_geojson(map_df, lat_col, lon_col)
             st.download_button(
-                label="📊 Télécharger Données (GeoJSON)",
+                label=" Télécharger Données (GeoJSON)",
                 data=geojson_data,
                 file_name=f"donnees_{datetime.now().strftime('%Y%m%d_%H%M%S')}.geojson",
                 mime="application/json",
@@ -639,9 +639,10 @@ def run_maps_page(
 
     # Afficher aperçu des données
     st.markdown("---")
-    st.subheader("📊 Aperçu des données")
+    st.subheader(" Aperçu des données")
     cols_to_show = [lat_col, lon_col]
     if color_col:
         cols_to_show.append(color_col)
     st.dataframe(df_filtered[cols_to_show].head(10), use_container_width=True)
+
 
