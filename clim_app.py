@@ -4,7 +4,6 @@ Flux fonctionnel :
 - Chargement des données climatiques / exposition
 - EDA rapide
 - Prétraitement de base (dates, agrégation, rolling, résumé d'anomalies)
-- Analyse spatiale et actuarielle
 - Modélisation (plusieurs modèles au choix)
 - Évaluation
 - Cartographie du risque
@@ -16,34 +15,17 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 import altair as alt
-import altair.vegalite.v4
-from typing import Dict, Any, Optional, List, Tuple
-from datetime import datetime
 
 # Imports des modules avec gestion d'erreur
 try:
-    # Modules de base
     import clim_data_loader
     import clim_preprocessing
-    import clim_insurance   # Module pour l'analyse actuarielle
     import clim_modeling
     import clim_evaluation
-    import clim_visualization  # Module de visualisation avancée
+    import clim_reporting
+    import clim_maps
     import clim_model_comparison
-    import clim_reporting  # Module de génération de rapports
     from clim_data_utils import merge_dataframes
-    
-    # Import des composants géospatiaux
-    from clim_geospatial import (
-        GeoProcessor,
-        create_map,
-        run_maps_page,
-        detect_lat_lon_columns,
-        show_risk_map,
-        spatial_join_hazard,
-        calculate_water_proximity,
-        add_climate_scenario
-    )
 except ImportError as e:
     st.error(f"❌ Erreur d'import des modules : {e}")
     st.stop()
@@ -229,46 +211,40 @@ def main() -> None:
         """,
         unsafe_allow_html=True,
     )
-    
-    st.caption("Développé par Yacoubou KOUMAI - © 2025 | v1.0.0")
+
     st.title("📊 Data Tool Climatique")
     st.markdown("Bienvenue dans ton outil de risque climatique interactif 🚀")
-   
 
     st.sidebar.title("📌 Navigation")
     section = st.sidebar.radio(
         "Aller à :",
         [
-            "Accueil", 
-            "Chargement", 
-            "Prétraitement", 
-            "Analyse Spatiale",
-            "Analyse Actuarielle",
-            "Modélisation", 
-            "Évaluation", 
-            "Cartes", 
-            "Reporting"
-        ]
+            "🎯 Cadrage du Projet",
+            "📥 Chargement",
+            "🔎 EDA Climatique",
+            "🛠️ Prétraitement Climat",
+            "🤖 Modélisation du Risque",
+            "📈 Évaluation & Scénarios",
+            "🗺️ Cartographie du Risque",
+            "📝 Reporting",
+        ],
     )
 
-    # Router vers la page sélectionnée
-    if section == "Accueil":
+    if section == "🎯 Cadrage du Projet":
         page_framing()
-    elif section == "Chargement":
+    elif section == "📥 Chargement":
         page_loading()
-    elif section == "Prétraitement":
+    elif section == "🔎 EDA Climatique":
+        page_eda()
+    elif section == "🛠️ Prétraitement Climat":
         page_preprocessing()
-    elif section == "Analyse Spatiale":
-        page_spatial_analysis()
-    elif section == "Analyse Actuarielle":
-        page_insurance_analysis()
-    elif section == "Modélisation":
+    elif section == "🤖 Modélisation du Risque":
         page_modeling()
-    elif section == "Évaluation":
+    elif section == "📈 Évaluation & Scénarios":
         page_evaluation()
-    elif section == "Cartes":
+    elif section == "🗺️ Cartographie du Risque":
         page_maps()
-    elif section == "Reporting":
+    else:
         page_reporting()
 
 
@@ -1053,258 +1029,14 @@ def page_maps() -> None:
         st.warning("Veuillez d'abord charger des données.")
         return
 
-    # Utiliser la nouvelle fonction run_maps_page du module clim_geospatial
-    run_maps_page(df, title="Carte des risques climatiques")
+    # Ne pas afficher de titre ici car run_maps_page le fait déjà
+    clim_maps.run_maps_page(df, title="")
 
-
-def page_spatial_analysis() -> None:
-    """Page d'analyse spatiale des données climatiques."""
-    st.header("🌍 Analyse Spatiale")
-    
-    # Vérifier si des données sont disponibles
-    df = _select_data_source()
-    if df is None or df.empty:
-        st.warning("Veuillez d'abord charger des données dans l'onglet 📥 Chargement.")
-        return
-    
-    # Détecter automatiquement les colonnes de coordonnées
-    lat_col, lon_col = detect_lat_lon_columns(df)
-    
-    if not lat_col or not lon_col:
-        st.error("Aucune colonne géographique (latitude/longitude) trouvée dans les données.")
-        return
-    
-    # Configuration de l'analyse
-    st.subheader("⚙️ Paramètres de l'analyse")
-    
-    # Sélection des colonnes
-    col1, col2 = st.columns(2)
-    with col1:
-        # Sélection de la variable à visualiser
-        numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
-        if not numeric_cols:
-            st.warning("Aucune colonne numérique trouvée pour la visualisation.")
-            return
-            
-        value_col = st.selectbox(
-            "Variable à visualiser",
-            options=numeric_cols,
-            index=0  # Toujours 0 car on a vérifié que la liste n'est pas vide
-        )
-    
-    with col2:
-        # Options d'affichage
-        map_type = st.selectbox(
-            "Type de visualisation",
-            ["Points", "Heatmap", "Cluster"],
-            index=0
-        )
-    
-    # Affichage de la carte
-    st.subheader("🗺️ Visualisation Spatiale")
-    
-    try:
-        # Créer un GeoDataFrame
-        geo_processor = GeoProcessor()
-        gdf = geo_processor.create_geodataframe(df, lat_col=lat_col, lon_col=lon_col)
-        
-        # Afficher la carte avec le nouveau module
-        st.pydeck_chart(create_map(
-            gdf,
-            value_col=value_col,
-            map_type=map_type.lower()
-        ))
-        
-        # Section d'analyse avancée
-        st.subheader("🔍 Analyse Avancée")
-        
-        # Options d'analyse
-        analysis_type = st.selectbox(
-            "Type d'analyse",
-            ["Aucune", "Proximité à l'eau", "Détection de clusters", "Scénario climatique"],
-            index=0
-        )
-        
-        if analysis_type == "Proximité à l'eau":
-            st.info("Analyse de proximité à l'eau à implémenter")
-            
-        elif analysis_type == "Détection de clusters":
-            st.info("Détection de clusters à implémenter")
-            
-        elif analysis_type == "Scénario climatique":
-            st.info("Analyse de scénario climatique à implémenter")
-        
-    except Exception as e:
-        st.error(f"Erreur lors de l'analyse spatiale : {str(e)}")
-        st.exception(e)
-
-def page_insurance_analysis() -> None:
-    """Page d'analyse actuarielle des risques climatiques."""
-    st.header("📊 Analyse Actuarielle")
-    
-    # Vérifier si des données sont disponibles
-    df = _select_data_source()
-    if df is None or df.empty:
-        st.warning("Veuillez d'abord charger des données dans l'onglet 📥 Chargement.")
-        return
-    
-    # Vérifier les colonnes nécessaires
-    required_cols = ['prime', 'sinistre', 'cout']
-    missing_cols = [col for col in required_cols if col not in df.columns]
-    
-    if missing_cols:
-        st.warning(f"Colonnes manquantes pour l'analyse actuarielle : {', '.join(missing_cols)}")
-        return
-    
-    # Configuration de l'analyse
-    st.subheader("⚙️ Paramètres de l'analyse")
-    
-    # Sélection des paramètres d'analyse
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # Sélection de la période d'analyse
-        if 'date' in df.columns:
-            min_date = pd.to_datetime(df['date']).min()
-            max_date = pd.to_datetime(df['date']).max()
-            date_range = st.date_input(
-                "Période d'analyse",
-                value=(min_date, max_date),
-                min_value=min_date,
-                max_value=max_date
-            )
-    
-    with col2:
-        # Sélection des métriques à afficher
-        metrics = st.multiselect(
-            "Métriques à calculer",
-            options=['Prime Pure', 'Sinistralité', 'Prime Pure Moyenne', 'Taux de Fréquence'],
-            default=['Prime Pure', 'Sinistralité']
-        )
-    
-    # Calcul des indicateurs clés
-    st.subheader("📈 Indicateurs Clés")
-    
-    try:
-        # Initialiser l'analyseur d'assurance
-        analyzer = clim_insurance.InsuranceAnalyzer()
-        
-        # Calculer les indicateurs de risque
-        if 'Prime Pure' in metrics and 'prime' in df.columns and 'sinistre' in df.columns:
-            # Calculer la prime pure moyenne
-            avg_premium = df['prime'].mean()
-            avg_claim = df['sinistre'].mean()
-            pure_premium = avg_claim / avg_premium if avg_premium > 0 else 0
-            
-            # Afficher les indicateurs
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Prime Moyenne", f"{avg_premium:.2f} €")
-            with col2:
-                st.metric("Sinistre Moyen", f"{avg_claim:.2f} €")
-            with col3:
-                st.metric("Ratio Sinistre/Prime", f"{pure_premium:.2%}")
-        
-        # Afficher les graphiques
-        st.subheader("📊 Visualisations")
-        
-        # Graphique d'évolution des sinistres
-        if 'date' in df.columns and 'sinistre' in df.columns:
-            st.write("### Évolution des sinistres")
-            
-            # Grouper par date si nécessaire
-            df['date'] = pd.to_datetime(df['date'])
-            time_series = df.set_index('date')['sinistre'].resample('M').sum().reset_index()
-            
-            # Créer le graphique avec Altair
-            import altair as alt
-            
-            chart = alt.Chart(time_series).mark_line().encode(
-                x='date:T',
-                y='sinistre:Q',
-                tooltip=['date:T', 'sinistre:Q']
-            ).properties(
-                width=800,
-                height=400
-            )
-            st.altair_chart(chart, use_container_width=True)
-        
-        # Distribution des coûts
-        if 'cout' in df.columns:
-            st.write("### Distribution des coûts")
-            
-            # Créer l'histogramme avec Altair
-            hist = alt.Chart(df).mark_bar().encode(
-                alt.X("cout:Q", bin=True, title="Coût"),
-                y='count()',
-                tooltip=['count()', 'cout:Q']
-            ).properties(
-                width=800,
-                height=400
-            )
-            st.altair_chart(hist, use_container_width=True)
-        
-    except Exception as e:
-        st.error(f"Erreur lors de l'analyse actuarielle : {str(e)}")
-        st.exception(e)
 
 def page_reporting() -> None:
-    """
-    Page de génération de rapports sur les risques climatiques.
-    
-    Cette page permet de générer des rapports détaillés avec visualisations avancées
-    en utilisant le module clim_reporting_enhanced.
-    """
-    # Vérifier si des données sont disponibles
-    if 'data_sources' not in st.session_state or not st.session_state['data_sources']:
-        if 'clim_data' not in st.session_state:
-            st.warning("Veuillez d'abord charger des données dans l'onglet 'Chargement'.")
-            return
-        # Si clim_data existe mais pas data_sources, on crée une entrée dans data_sources
-        st.session_state['data_sources'] = {'Climat': st.session_state['clim_data']}
-    
-    # Récupérer les données (première source disponible ou source 'Climat')
-    if 'Climat' in st.session_state['data_sources']:
-        df = st.session_state['data_sources']['Climat']
-    else:
-        # Prendre la première source disponible
-        df = next(iter(st.session_state['data_sources'].values()))
-    
-    # Stocker les données dans st.session_state pour une utilisation ultérieure
-    st.session_state['df'] = df
-    
-    # Afficher l'interface utilisateur du reporting amélioré
-    try:
-        from clim_reporting_enhanced import show_reporting_ui
-        show_reporting_ui()
-    except ImportError:
-        st.error("Le module de reporting avancé n'est pas disponible.")
-        st.warning("Assurez-vous que le fichier 'clim_reporting_enhanced.py' est présent dans le même répertoire.")
-        
-        # Afficher une version simplifiée en cas d'erreur
-        st.title("📊 Reporting Climat")
-        st.warning("Mode de reporting basique - Le module avancé n'est pas disponible.")
-        
-        # Aperçu des données
-        st.subheader("Aperçu des données")
-        st.dataframe(df.head())
-        
-        # Options de base
-        st.subheader("Options d'export")
-        if st.button("Exporter vers CSV"):
-            csv = df.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="Télécharger CSV",
-                data=csv,
-                file_name=f"donnees_climat_{datetime.now().strftime('%Y%m%d')}.csv",
-                mime="text/csv"
-            )
+    st.header("📝 Reporting Climat")
+    clim_reporting.show_reporting_summary(st.session_state)
 
 
 if __name__ == "__main__":  # pragma: no cover
     main()
-
-
-
-
-
