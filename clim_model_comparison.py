@@ -341,7 +341,7 @@ def compare_models(
         results.append(result)
         
         if result["success"]:
-            time_text.text(f"⏱️ {model_name} : {model_time:.1f}s")
+            time_text.text(f" {model_name} : {model_time:.1f}s")
         else:
             time_text.text(f"❌ {model_name} : Échec")
         
@@ -395,12 +395,12 @@ def display_comparison_results(results: List[Dict[str, Any]], task: str) -> Dict
     
     # Afficher le meilleur modèle en haut
     st.success(
-        f"🏆 **Meilleur modèle** : {best_result['model_name']} "
+        f" **Meilleur modèle** : {best_result['model_name']} "
         f"({best_result['metric_name']} = {best_result['test_score']:.4f})"
     )
 
     # Afficher le tableau
-    st.subheader("📊 Tableau de comparaison")
+    st.subheader(" Tableau de comparaison")
     st.dataframe(results_df.style.format({
         "Score Test": "{:.4f}",
         "Score Train": "{:.4f}",
@@ -413,7 +413,7 @@ def display_comparison_results(results: List[Dict[str, Any]], task: str) -> Dict
 
     # Graphiques de comparaison
     st.markdown("---")
-    st.subheader("📈 Visualisations")
+    st.subheader(" Visualisations")
     
     col1, col2 = st.columns(2)
     
@@ -445,7 +445,7 @@ def display_comparison_results(results: List[Dict[str, Any]], task: str) -> Dict
     metric_cols = [col for col in results_df.columns if col not in ["Modèle", "Temps (s)"]]
     if len(metric_cols) >= 2:
         st.markdown("---")
-        st.subheader("🔥 Heatmap des métriques")
+        st.subheader(" Heatmap des métriques")
         
         fig3, ax3 = plt.subplots(figsize=(10, len(results_df) * 0.5 + 2))
         heatmap_data = results_df[["Modèle"] + metric_cols].set_index("Modèle")
@@ -473,3 +473,4 @@ def display_comparison_results(results: List[Dict[str, Any]], task: str) -> Dict
                 st.error(f"**{r['model_name']}** : {r['error']}")
 
     return best_result
+
