@@ -203,6 +203,66 @@ def show_heatmap_folium(
         st.error(f"❌ Erreur heatmap : {e}")
 
 
+def show_simple_points_folium(
+    map_df: pd.DataFrame,
+    color_col: Optional[str] = None,
+    tile_layer: str = "CartoDB positron",
+) -> None:
+    """Affiche les points simples sur une carte (visualisation basique et rapide)."""
+    try:
+        center_lat = map_df["latitude"].mean()
+        center_lon = map_df["longitude"].mean()
+
+        m = folium.Map(
+            location=[center_lat, center_lon],
+            zoom_start=6,
+            tiles=tile_layer,
+        )
+
+        if "risk_value" in map_df.columns:
+            # ⚡ Vectorisation : calcul des couleurs une seule fois
+            palette = COLOR_PALETTES["RdYlBu"]
+            colors = _get_colors_vectorized(
+                map_df["risk_value"].values,
+                palette
+            )
+            
+            for lat, lon, color, val in zip(
+                map_df["latitude"],
+                map_df["longitude"],
+                colors,
+                map_df["risk_value"]
+            ):
+                folium.CircleMarker(
+                    location=[lat, lon],
+                    radius=6,
+                    popup=f"<b>Risque: {val:.2f}</b>",
+                    tooltip=f"Risque: {val:.2f}",
+                    color=color,
+                    fill=True,
+                    fillColor=color,
+                    fillOpacity=0.6,
+                    weight=1,
+                ).add_to(m)
+        else:
+            # Points sans valeur
+            for lat, lon in zip(map_df["latitude"], map_df["longitude"]):
+                folium.CircleMarker(
+                    location=[lat, lon],
+                    radius=4,
+                    color="blue",
+                    fill=True,
+                    fillColor="blue",
+                    fillOpacity=0.5,
+                    weight=1,
+                ).add_to(m)
+
+        st_folium(m, width=1200, height=600)
+
+    except Exception as e:
+        st.error(f"❌ Erreur points : {e}")
+
+
 def show_markers_folium(
     map_df: pd.DataFrame,
     color_col: Optional[str] = None,
@@ -404,10 +464,11 @@ def run_maps_page(
             "Type de visualisation",
             options=[
                 "🔥 Heatmap (Climatique)",
+                "� Points simples",
                 "📍 Markers + Clusters",
                 "🎯 Gradient 3D (PyDeck)",
             ],
-            index=0 if "Heatmap" in recommended_viz else (1 if "Markers" in recommended_viz else 2),
+            index=0 if "Heatmap" in recommended_viz else (1 if "Points" in recommended_viz else (2 if "Markers" in recommended_viz else 3)),
             help=f"⚡ Recommandé pour {n_points} points : {recommended_viz}"
         )
 
@@ -482,7 +543,13 @@ def run_maps_page(
         else:
             show_heatmap_folium(map_df, color_col, tile_layer)
 
-    elif viz_type == "📍 Markers + Clusters":
+    elif viz_type == "� Points simples":
+        if not FOLIUM_AVAILABLE:
+            st.error("❌ Folium non installé. Installer avec : `pip install folium streamlit-folium`")
+        else:
+            show_simple_points_folium(map_df, color_col, tile_layer)
+
+    elif viz_type == "�📍 Markers + Clusters":
         if not FOLIUM_AVAILABLE:
             st.error("❌ Folium non installé. Installer avec : `pip install folium streamlit-folium`")
         else:
