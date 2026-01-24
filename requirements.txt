@@ -13,3 +13,5 @@ plotly-express>=0.4.1
 xarray>=2022.6.0
 rioxarray>=0.12.0
 statsmodels>=0.13.0
+altair.vegalite.v4
+
