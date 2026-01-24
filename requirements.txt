@@ -15,7 +15,7 @@ lightgbm>=4.0.0
 # ===== VISUALISATION =====
 matplotlib>=3.7.0
 seaborn>=0.12.0
-folium streamlit-folium
+folium
 
 # ===== PROFILING (OBLIGATOIRE) =====
 # Nécessite Python 3.11 (configuré via runtime.txt)
@@ -37,3 +37,4 @@ minify-html>=0.18.0
 phik>=0.12.0
 requests>=2.31.0
 tqdm>=4.65.0
+
