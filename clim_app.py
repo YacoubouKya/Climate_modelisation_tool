@@ -16,6 +16,7 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 import altair as alt
+import altair.vegalite.v4
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
 
@@ -1302,6 +1303,7 @@ def page_reporting() -> None:
 
 if __name__ == "__main__":  # pragma: no cover
     main()
+
 
 
 
