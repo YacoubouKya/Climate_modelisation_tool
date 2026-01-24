@@ -212,37 +212,37 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
-    st.title("📊 Data Tool Climatique")
+    st.title(" Data Tool Climatique")
     st.markdown("Bienvenue dans ton outil de risque climatique interactif 🚀")
 
-    st.sidebar.title("📌 Navigation")
+    st.sidebar.title(" Navigation")
     section = st.sidebar.radio(
         "Aller à :",
         [
-            "🎯 Cadrage du Projet",
-            "📥 Chargement",
-            "🔎 EDA Climatique",
-            "🛠️ Prétraitement Climat",
-            "🤖 Modélisation du Risque",
-            "📈 Évaluation & Scénarios",
-            "🗺️ Cartographie du Risque",
-            "📝 Reporting",
+            " Cadrage du Projet",
+            " Chargement",
+            " EDA Climatique",
+            " Prétraitement Climat",
+            " Modélisation du Risque",
+            " Évaluation & Scénarios",
+            " Cartographie du Risque",
+            " Reporting",
         ],
     )
 
-    if section == "🎯 Cadrage du Projet":
+    if section == " Cadrage du Projet":
         page_framing()
-    elif section == "📥 Chargement":
+    elif section == " Chargement":
         page_loading()
-    elif section == "🔎 EDA Climatique":
+    elif section == " EDA Climatique":
         page_eda()
-    elif section == "🛠️ Prétraitement Climat":
+    elif section == " Prétraitement Climat":
         page_preprocessing()
-    elif section == "🤖 Modélisation du Risque":
+    elif section == " Modélisation du Risque":
         page_modeling()
-    elif section == "📈 Évaluation & Scénarios":
+    elif section == " Évaluation & Scénarios":
         page_evaluation()
-    elif section == "🗺️ Cartographie du Risque":
+    elif section == " Cartographie du Risque":
         page_maps()
     else:
         page_reporting()
@@ -251,7 +251,7 @@ def main() -> None:
 def page_framing() -> None:
     """Page de cadrage du projet climat : objectif, unité d'analyse, cible."""
 
-    st.header("🎯 Cadrage du Projet Climat")
+    st.header(" Cadrage du Projet Climat")
     st.markdown(
         """Définissez clairement l'objectif métier et le périmètre de votre analyse 
         avant de charger et traiter les données. Ces informations seront reprises dans le rapport final."""
@@ -292,7 +292,7 @@ def page_framing() -> None:
         placeholder="Ex: Hackathon 48h, mission client, étude académique",
     )
 
-    if st.button("💾 Enregistrer le cadrage"):
+    if st.button(" Enregistrer le cadrage"):
         st.session_state["project_framing"] = {
             "objective_type": objective_type,
             "objective_desc": objective_desc,
@@ -438,9 +438,9 @@ def page_loading() -> None:
     # Afficher les sources chargées
     if st.session_state["data_sources"]:
         st.markdown("---")
-        st.subheader("📋 Sources chargées")
+        st.subheader(" Sources chargées")
         for idx, (label, df) in enumerate(st.session_state["data_sources"].items()):
-            st.markdown(f"**📄 {label}** : {df.shape[0]} lignes × {df.shape[1]} colonnes")
+            st.markdown(f"** {label}** : {df.shape[0]} lignes × {df.shape[1]} colonnes")
             col1, col2 = st.columns([4, 1])
             with col1:
                 st.dataframe(df.head(), use_container_width=True)
@@ -512,7 +512,7 @@ def page_eda() -> None:
 
 
 def page_preprocessing() -> None:
-    st.header("🛠️ Prétraitement Climat")
+    st.header(" Prétraitement Climat")
     
     # Sélection de la source (comme dans EDA)
     df = _select_data_source()
@@ -666,7 +666,7 @@ def page_preprocessing() -> None:
 
 
 def page_modeling() -> None:
-    st.header("🤖 Modélisation du Risque Climatique")
+    st.header(" Modélisation du Risque Climatique")
     
     # Sélection de la source de données
     df = _select_data_source()
@@ -675,7 +675,7 @@ def page_modeling() -> None:
         return
 
     # Configuration de base
-    st.subheader("🎯 Configuration")
+    st.subheader(" Configuration")
     col1, col2 = st.columns(2)
     
     with col1:
@@ -706,7 +706,7 @@ def page_modeling() -> None:
 
     # Options communes
     st.markdown("---")
-    st.subheader("⚙️ Options avancées")
+    st.subheader(" Options avancées")
     col1, col2, col3 = st.columns(3)
     
     with col1:
@@ -719,7 +719,7 @@ def page_modeling() -> None:
     # MODE 1 : Modèle unique
     if modeling_mode == "Modèle unique":
         st.markdown("---")
-        st.subheader("🎯 Modèle unique")
+        st.subheader(" Modèle unique")
         
         model_name = st.selectbox(
             "Type de modèle",
@@ -727,7 +727,7 @@ def page_modeling() -> None:
             index=0,
         )
 
-        if st.button("🚀 Entraîner le modèle"):
+        if st.button(" Entraîner le modèle"):
             with st.spinner("Entraînement en cours..."):
                 results, final_task = clim_model_comparison.compare_models(
                     df,
@@ -768,7 +768,7 @@ def page_modeling() -> None:
     # MODE 2 : Comparaison de modèles
     elif modeling_mode == "Comparaison de modèles":
         st.markdown("---")
-        st.subheader("🏆 Comparaison de modèles")
+        st.subheader(" Comparaison de modèles")
         
         # Obtenir les modèles disponibles
         available_models = list(clim_model_comparison.get_available_models(
@@ -782,7 +782,7 @@ def page_modeling() -> None:
             default=available_models[:5] if len(available_models) >= 5 else available_models
         )
 
-        if st.button("🚀 Comparer les modèles"):
+        if st.button(" Comparer les modèles"):
             if not selected_models:
                 st.warning("Veuillez sélectionner au moins un modèle.")
             else:
@@ -833,14 +833,14 @@ def page_modeling() -> None:
             # Afficher le score de base avec contexte
             col1, col2, col3 = st.columns([2, 1, 1])
             with col1:
-                st.info(f"📌 Modèle sélectionné : **{best_result['model_name']}**")
+                st.info(f" Modèle sélectionné : **{best_result['model_name']}**")
             with col2:
                 st.metric("Score de base", f"{best_result['test_score']:.4f}")
             with col3:
                 st.metric("Temps", f"{best_result['training_time']:.2f}s")
             
-            st.success(f"🏆 Meilleur modèle de la comparaison (Score: {best_result['test_score']:.4f})")
-            st.info("💡 Les hyperparamètres du meilleur modèle sont pré-remplis. Vous pouvez les modifier pour optimiser davantage.")
+            st.success(f" Meilleur modèle de la comparaison (Score: {best_result['test_score']:.4f})")
+            st.info(" Les hyperparamètres du meilleur modèle sont pré-remplis. Vous pouvez les modifier pour optimiser davantage.")
             
             st.markdown("---")
             st.markdown("**Hyperparamètres à affiner**")
@@ -928,7 +928,7 @@ def page_modeling() -> None:
                             # Afficher un message selon l'amélioration
                             improvement = tuned_result['test_score'] - best_result['test_score']
                             if improvement > 0.01:
-                                st.success(f"🎉 Amélioration significative : +{improvement:.4f}")
+                                st.success(f" Amélioration significative : +{improvement:.4f}")
                             elif improvement > 0:
                                 st.info(f"✓ Légère amélioration : +{improvement:.4f}")
                             else:
@@ -962,7 +962,7 @@ def page_modeling() -> None:
                     st.warning("Implémentation complète à venir pour Gradient Boosting")
             
             else:
-                st.info("💡 L'affinage détaillé pour ce type de modèle sera ajouté prochainement.")
+                st.info(" L'affinage détaillé pour ce type de modèle sera ajouté prochainement.")
                 st.markdown("""
                 **Modèles supportés pour l'affinage :**
                 - ✅ Random Forest
@@ -972,7 +972,7 @@ def page_modeling() -> None:
 
 
 def page_evaluation() -> None:
-    st.header("📈 Évaluation & Scénarios")
+    st.header(" Évaluation & Scénarios")
     info = st.session_state.get("clim_model_info")
     if info is None:
         st.warning("Aucun modèle climat n’a encore été entraîné.")
@@ -1031,9 +1031,10 @@ def page_maps() -> None:
 
 
 def page_reporting() -> None:
-    st.header("📝 Reporting Climat")
+    st.header(" Reporting Climat")
     clim_reporting.show_reporting_summary(st.session_state)
 
 
 if __name__ == "__main__":  # pragma: no cover
     main()
+
