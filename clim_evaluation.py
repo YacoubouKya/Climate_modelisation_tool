@@ -76,7 +76,7 @@ def show_evaluation(info: dict) -> None:
     y_test = info.get("y_test")
     y_pred = info.get("y_pred")
 
-    st.subheader("📊 Résultats globaux")
+    st.subheader(" Résultats globaux")
     
     # Afficher les métriques principales
     col1, col2, col3 = st.columns(3)
@@ -100,7 +100,7 @@ def show_evaluation(info: dict) -> None:
     y_pred = pd.Series(y_pred, index=y_test.index)
 
     if task_type == "classification":
-        st.subheader("🧩 Matrice de confusion")
+        st.subheader(" Matrice de confusion")
         labels = sorted(y_test.unique())
         cm = confusion_matrix(y_test, y_pred, labels=labels)
 
@@ -111,7 +111,7 @@ def show_evaluation(info: dict) -> None:
         st.pyplot(fig)
         
         # Métriques détaillées
-        st.subheader("📊 Métriques détaillées")
+        st.subheader(" Métriques détaillées")
         try:
             precision = precision_score(y_test, y_pred, average="weighted", zero_division=0)
             recall = recall_score(y_test, y_pred, average="weighted", zero_division=0)
@@ -132,7 +132,7 @@ def show_evaluation(info: dict) -> None:
         if len(labels) == 2 and "y_proba" in info:
             y_proba = info["y_proba"]
             if y_proba is not None and len(y_proba.shape) == 2:
-                st.subheader("📈 Courbes PR et ROC")
+                st.subheader(" Courbes PR et ROC")
                 
                 # Courbe Precision-Recall
                 precision_curve, recall_curve, _ = precision_recall_curve(y_test, y_proba[:, 1])
@@ -169,7 +169,7 @@ def show_evaluation(info: dict) -> None:
             if isinstance(X_test, pd.DataFrame):
                 cat_cols = X_test.select_dtypes(include=["object", "category"]).columns.tolist()
                 if cat_cols:
-                    st.subheader("🔍 Analyse par segment")
+                    st.subheader(" Analyse par segment")
                     segment_col = st.selectbox("Colonne de segmentation", options=cat_cols)
                     
                     if segment_col:
@@ -197,7 +197,7 @@ def show_evaluation(info: dict) -> None:
                         st.pyplot(fig)
 
     else:
-        st.subheader("📈 Prédictions vs valeurs réelles")
+        st.subheader(" Prédictions vs valeurs réelles")
         fig, ax = plt.subplots(figsize=(6, 5))
         ax.scatter(y_test, y_pred, alpha=0.6)
         min_val = float(min(y_test.min(), y_pred.min()))
@@ -207,7 +207,7 @@ def show_evaluation(info: dict) -> None:
         ax.set_ylabel("Prédictions")
         st.pyplot(fig)
 
-        st.subheader("📉 Résidus")
+        st.subheader(" Résidus")
         residuals = y_test - y_pred
         fig2, ax2 = plt.subplots(figsize=(6, 4))
         sns.histplot(residuals, kde=True, ax=ax2)
@@ -215,7 +215,7 @@ def show_evaluation(info: dict) -> None:
         st.pyplot(fig2)
         
         # Métriques orientées risque pour régression
-        st.subheader("⚠️ Métriques orientées risque")
+        st.subheader(" Métriques orientées risque")
         mae = np.abs(residuals).mean()
         rmse = np.sqrt((residuals ** 2).mean())
         mape = (np.abs(residuals / y_test) * 100).mean() if (y_test != 0).all() else np.nan
@@ -260,3 +260,4 @@ def show_evaluation(info: dict) -> None:
                         ax.set_title(f"Erreur par {segment_col}")
                         plt.xticks(rotation=45, ha="right")
                         st.pyplot(fig)
+
