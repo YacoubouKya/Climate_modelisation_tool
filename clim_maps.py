@@ -2,11 +2,14 @@
 
 Supporte PyDeck (3D, haute performance) et Folium (heatmap, fonds élégants).
 Optimisé pour les gros datasets avec mise en cache et vectorisation NumPy.
+Inclut export HTML et GeoJSON.
 """
 
 from __future__ import annotations
 
+import json
 import time
+from datetime import datetime
 from typing import Optional
 
 import numpy as np
@@ -137,8 +140,8 @@ def show_heatmap_folium(
     map_df: pd.DataFrame,
     color_col: Optional[str] = None,
     tile_layer: str = "CartoDB positron",
-) -> None:
-    """Affiche une heatmap Folium optimisée (meilleure pour climatique)."""
+) -> Optional[folium.Map]:
+    """Affiche une heatmap Folium optimisée et retourne la carte pour export."""
     try:
         center_lat = map_df["latitude"].mean()
         center_lon = map_df["longitude"].mean()
@@ -198,17 +201,19 @@ def show_heatmap_folium(
                 ).add_to(m)
 
         st_folium(m, width=1200, height=600)
+        return m
 
     except Exception as e:
         st.error(f"❌ Erreur heatmap : {e}")
+        return None
 
 
 def show_simple_points_folium(
     map_df: pd.DataFrame,
     color_col: Optional[str] = None,
     tile_layer: str = "CartoDB positron",
-) -> None:
-    """Affiche les points simples sur une carte (visualisation basique et rapide)."""
+) -> Optional[folium.Map]:
+    """Affiche les points simples et retourne la carte pour export."""
     try:
         center_lat = map_df["latitude"].mean()
         center_lon = map_df["longitude"].mean()
@@ -258,17 +263,19 @@ def show_simple_points_folium(
                 ).add_to(m)
 
         st_folium(m, width=1200, height=600)
+        return m
 
     except Exception as e:
         st.error(f"❌ Erreur points : {e}")
+        return None
 
 
 def show_markers_folium(
     map_df: pd.DataFrame,
     color_col: Optional[str] = None,
     tile_layer: str = "CartoDB positron",
-) -> None:
-    """Affiche markers avec clustering optimisé (détail + vue générale)."""
+) -> Optional[folium.Map]:
+    """Affiche markers avec clustering optimisé et retourne la carte pour export."""
     try:
         center_lat = map_df["latitude"].mean()
         center_lon = map_df["longitude"].mean()
@@ -319,9 +326,54 @@ def show_markers_folium(
                 ).add_to(marker_cluster)
 
         st_folium(m, width=1200, height=600)
+        return m
 
     except Exception as e:
         st.error(f"❌ Erreur markers : {e}")
+        return None
+
+
+def export_map_html(map_folium: folium.Map) -> bytes:
+    """Exporte une carte Folium en HTML avec timestamp."""
+    try:
+        # Sauvegarder en HTML
+        html_data = map_folium._repr_html_().encode('utf-8')
+        return html_data
+    except Exception as e:
+        st.error(f"❌ Erreur export HTML : {e}")
+        return b""
+
+
+def export_data_geojson(map_df: pd.DataFrame, lat_col: str, lon_col: str, color_col: Optional[str] = None) -> str:
+    """Exporte les données en format GeoJSON."""
+    try:
+        features = []
+        for idx, row in map_df.iterrows():
+            feature = {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [row["longitude"], row["latitude"]]
+                },
+                "properties": {}
+            }
+            
+            # Ajouter les propriétés
+            if "risk_value" in map_df.columns:
+                feature["properties"]["risque"] = float(row["risk_value"])
+            
+            features.append(feature)
+        
+        geojson_data = {
+            "type": "FeatureCollection",
+            "features": features
+        }
+        
+        geojson_str = json.dumps(geojson_data, indent=2)
+        return geojson_str
+    except Exception as e:
+        st.error(f"❌ Erreur export GeoJSON : {e}")
+        return "{}"
 
 
 def show_gradient_3d_pydeck(
@@ -536,30 +588,54 @@ def run_maps_page(
 
     # Afficher selon type de visualisation
     render_start = time.time()
+    folium_map = None
     
     if viz_type == "🔥 Heatmap (Climatique)":
         if not FOLIUM_AVAILABLE:
             st.error("❌ Folium non installé. Installer avec : `pip install folium streamlit-folium`")
         else:
-            show_heatmap_folium(map_df, color_col, tile_layer)
+            folium_map = show_heatmap_folium(map_df, color_col, tile_layer)
 
-    elif viz_type == "� Points simples":
+    elif viz_type == "🎯 Points simples":
         if not FOLIUM_AVAILABLE:
             st.error("❌ Folium non installé. Installer avec : `pip install folium streamlit-folium`")
         else:
-            show_simple_points_folium(map_df, color_col, tile_layer)
+            folium_map = show_simple_points_folium(map_df, color_col, tile_layer)
 
-    elif viz_type == "�📍 Markers + Clusters":
+    elif viz_type == "📍 Markers + Clusters":
         if not FOLIUM_AVAILABLE:
             st.error("❌ Folium non installé. Installer avec : `pip install folium streamlit-folium`")
         else:
-            show_markers_folium(map_df, color_col, tile_layer)
+            folium_map = show_markers_folium(map_df, color_col, tile_layer)
 
     elif viz_type == "🎯 Gradient 3D (PyDeck)":
         show_gradient_3d_pydeck(map_df, color_palette)
 
     render_time = time.time() - render_start
     st.caption(f"⏱️ Rendu en {render_time:.2f}s")
+
+    # Boutons de téléchargement pour les cartes Folium
+    if folium_map is not None:
+        st.markdown("---")
+        col_dl1, col_dl2 = st.columns(2)
+        
+        with col_dl1:
+            html_data = export_map_html(folium_map)
+            st.download_button(
+                label="⬇️ Télécharger Carte (HTML)",
+                data=html_data,
+                file_name=f"carte_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
+                mime="text/html",
+            )
+        
+        with col_dl2:
+            geojson_data = export_data_geojson(map_df, lat_col, lon_col)
+            st.download_button(
+                label="📊 Télécharger Données (GeoJSON)",
+                data=geojson_data,
+                file_name=f"donnees_{datetime.now().strftime('%Y%m%d_%H%M%S')}.geojson",
+                mime="application/json",
+            )
 
     # Afficher aperçu des données
     st.markdown("---")
