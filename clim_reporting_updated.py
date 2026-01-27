@@ -40,7 +40,7 @@ def _img_to_base64(fig: plt.Figure, width: int = 800) -> str:
         Chaîne HTML contenant l'image encodée en base64
     """
     buf = BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight", facecolor='#0b1120', edgecolor='none')
+    fig.savefig(buf, format="png", bbox_inches="tight", facecolor='white', edgecolor='none')
     buf.seek(0)
     img_str = base64.b64encode(buf.read()).decode("utf-8")
     plt.close(fig)
@@ -76,38 +76,37 @@ def _get_climate_report_css() -> str:
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             line-height: 1.6;
-            color: #e5e7eb;
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #333;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
             padding: 20px;
         }
 
         .container {
             max-width: 1100px;
             margin: 0 auto;
-            background: #0b1120;
+            background: white;
             padding: 32px;
             border-radius: 10px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.45);
-            color: #e5e7eb;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
         }
 
         h1 {
-            color: #facc15;
+            color: #2c3e50;
             font-size: 2.5em;
             margin-bottom: 20px;
-            border-bottom: 3px solid #facc15;
+            border-bottom: 3px solid #3498db;
             padding-bottom: 15px;
             text-align: center;
         }
 
         h2 {
-            color: #facc15;
+            color: #34495e;
             font-size: 1.8em;
-            margin-top: 40px;
+            margin-top: 30px;
             margin-bottom: 20px;
             padding-left: 15px;
             border-left: 5px solid #facc15;
-            background: #1e293b;
+            background: #f8f9fa;
             padding: 15px;
             border-radius: 5px;
         }
@@ -201,7 +200,7 @@ def _get_climate_report_css() -> str:
         }
 
         .info-box {
-            background: #1e293b;
+            background: #e8f4f8;
             border-left: 4px solid #3b82f6;
             padding: 15px;
             margin: 20px 0;
@@ -210,7 +209,7 @@ def _get_climate_report_css() -> str:
         }
 
         .warning-box {
-            background: #451a03;
+            background: #fff3cd;
             border-left: 4px solid #f97316;
             padding: 15px;
             margin: 20px 0;
@@ -218,7 +217,7 @@ def _get_climate_report_css() -> str:
         }
 
         .success-box {
-            background: #064e3b;
+            background: #d4edda;
             border-left: 4px solid #10b981;
             padding: 15px;
             margin: 20px 0;
@@ -235,21 +234,22 @@ def _get_climate_report_css() -> str:
         }
 
         code {
-            background: #1e293b;
+            background: #f8f9fa;
             padding: 2px 6px;
             border-radius: 4px;
             font-family: 'Courier New', monospace;
             font-size: 0.9em;
-            color: #f472b6;
+            color: #e91e63;
+            border: 1px solid #e9ecef;
         }
 
         .footer {
             margin-top: 40px;
             padding-top: 20px;
-            border-top: 1px solid #1f2937;
+            border-top: 1px solid #e9ecef;
             text-align: center;
-            color: #9ca3af;
-            font-size: 0.85em;
+            color: #6c757d;
+            font-size: 0.9em;
         }
 
         .figure-container {
@@ -384,64 +384,6 @@ def _get_modern_css():
         }
         
         .table-container {
-            width: 100%;
-            overflow-x: auto;
-            margin: 20px 0;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            min-width: 600px;
-        }
-        
-        table.dataframe {
-            font-size: 0.85em;
-            display: block;
-            overflow-x: auto;
-            white-space: nowrap;
-        }
-        
-        thead {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-        
-        th {
-            padding: 10px 8px;
-            text-align: left;
-            font-weight: 600;
-            font-size: 0.85em;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-            white-space: nowrap;
-        }
-        
-        td {
-            padding: 8px;
-            border-bottom: 1px solid #ecf0f1;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 200px;
-        }
-        
-        tbody tr:hover {
-            background: #f8f9fa;
-            transition: background 0.3s ease;
-        }
-        
-        tbody tr:nth-child(even) {
-            background: #f9f9f9;
-        }
-        
-        .table-container::after {
             content: "← Faites défiler horizontalement →";
             display: block;
             text-align: center;
@@ -961,22 +903,22 @@ def _create_time_series_plot(df: pd.DataFrame, date_col: str, value_col: str, ti
     Returns:
         Figure matplotlib
     """
-    fig, ax = plt.subplots(figsize=(12, 5), facecolor='#0b1120')
+    fig, ax = plt.subplots(figsize=(12, 5), facecolor='white')
     
     # Style du graphique
-    ax.set_facecolor('#0b1120')
+    ax.set_facecolor('white')
     for spine in ax.spines.values():
-        spine.set_edgecolor('#1e293b')
+        spine.set_edgecolor('#e9ecef')
     
     # Tracé de la série temporelle
-    ax.plot(df[date_col], df[value_col], color='#60a5fa', linewidth=1.5)
+    ax.plot(df[date_col], df[value_col], color='#3498db', linewidth=1.5)
     
     # Mise en forme
-    ax.set_title(title, color='white', pad=15, fontsize=14, fontweight='bold')
-    ax.set_xlabel('Date', color='#9ca3af', fontsize=11)
-    ax.set_ylabel(value_col, color='#9ca3af', fontsize=11)
-    ax.tick_params(colors='#9ca3af')
-    ax.grid(True, linestyle='--', alpha=0.3, color='#334155')
+    ax.set_title(title, color='#2c3e50', pad=15, fontsize=14, fontweight='bold')
+    ax.set_xlabel('Date', color='#6c757d', fontsize=11)
+    ax.set_ylabel(value_col, color='#6c757d', fontsize=11)
+    ax.tick_params(colors='#6c757d')
+    ax.grid(True, linestyle='--', alpha=0.3, color='#dee2e6')
     
     # Rotation des étiquettes de l'axe des x
     plt.xticks(rotation=45, ha='right')
@@ -1004,32 +946,32 @@ def _create_feature_importance_plot(feature_names: List[str], importances: np.nd
     values = importances[indices]
     
     # Création du graphique
-    fig, ax = plt.subplots(figsize=(10, 6), facecolor='#0b1120')
+    fig, ax = plt.subplots(figsize=(10, 6), facecolor='white')
     
     # Style du graphique
-    ax.set_facecolor('#0b1120')
+    ax.set_facecolor('white')
     for spine in ax.spines.values():
-        spine.set_edgecolor('#1e293b')
+        spine.set_edgecolor('#e9ecef')
     
     # Tracé des barres
     y_pos = np.arange(len(names))
-    bars = ax.barh(y_pos, values, align='center', color='#60a5fa')
+    bars = ax.barh(y_pos, values, align='center', color='#3498db')
     
     # Ajout des valeurs sur les barres
     for bar in bars:
         width = bar.get_width()
         ax.text(width * 1.02, bar.get_y() + bar.get_height()/2.,
                 f'{width:.3f}',
-                va='center', ha='left', color='white', fontsize=9)
+                va='center', ha='left', color='#2c3e50', fontsize=9)
     
     # Mise en forme
     ax.set_yticks(y_pos)
-    ax.set_yticklabels(names, color='white')
-    ax.tick_params(axis='x', colors='#9ca3af')
+    ax.set_yticklabels(names, color='#2c3e50')
+    ax.tick_params(axis='x', colors='#6c757d')
     ax.set_title('Top 10 des caractéristiques les plus importantes', 
-                 color='white', pad=15, fontsize=14, fontweight='bold')
-    ax.set_xlabel('Importance', color='#9ca3af', fontsize=11)
-    ax.grid(True, linestyle='--', alpha=0.2, color='#334155', axis='x')
+                 color='#2c3e50', pad=15, fontsize=14, fontweight='bold')
+    ax.set_xlabel('Importance', color='#6c757d', fontsize=11)
+    ax.grid(True, linestyle='--', alpha=0.2, color='#dee2e6', axis='x')
     
     # Ajustement des marges
     plt.tight_layout()

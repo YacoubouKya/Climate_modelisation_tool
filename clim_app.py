@@ -1044,6 +1044,7 @@ def page_maps() -> None:
 
 
 def page_reporting() -> None:
+    """Page de reporting avec interface améliorée"""
     st.header("📊 Reporting Climat")
     
     # Vérification des données disponibles
@@ -1062,38 +1063,56 @@ def page_reporting() -> None:
     
     # Options de personnalisation du rapport
     st.markdown("---")
-    st.subheader("⚙️ Options du Rapport")
+    st.subheader("⚙️ Configuration du Rapport")
     
-    # Sélection des sections à inclure
-    sections = [
-        ("📋 Synthèse Exécutive", "exec_summary", True),
-        ("📊 Analyse des Données", "data_analysis", True),
-        ("🔧 Prétraitement", "preprocessing", has_prep),
-        ("🤖 Modélisation", "modeling", has_model),
-        ("📈 Visualisations", "visualizations", has_prep or has_model),
-        ("📝 Recommandations", "recommendations", True)
-    ]
+    # Organisation en colonnes pour une meilleure présentation
+    col_left, col_right = st.columns([2, 1])
     
-    selected_sections = []
-    cols = st.columns(3)
-    for i, (name, key, enabled) in enumerate(sections):
-        with cols[i % 3]:
-            if st.checkbox(name, value=enabled, key=f"report_section_{key}", disabled=not enabled):
-                selected_sections.append(key)
+    with col_left:
+        st.markdown("##### 📋 Sections à inclure")
+        
+        # Sélection des sections à inclure avec une meilleure disposition
+        sections = [
+            ("📋 Synthèse Exécutive", "exec_summary", True),
+            ("📊 Analyse des Données", "data_analysis", True),
+            ("🔧 Prétraitement", "preprocessing", has_prep),
+            ("🤖 Modélisation", "modeling", has_model),
+            ("📈 Visualisations", "visualizations", has_prep or has_model),
+            ("📝 Recommandations", "recommendations", True)
+        ]
+        
+        selected_sections = []
+        # Afficher les sections en 2 colonnes pour une meilleure lisibilité
+        cols = st.columns(2)
+        for i, (name, key, enabled) in enumerate(sections):
+            with cols[i % 2]:
+                if st.checkbox(name, value=enabled, key=f"report_section_{key}", disabled=not enabled):
+                    selected_sections.append(key)
     
-    # Options avancées
-    st.markdown("---")
-    st.subheader("⚙️ Options avancées")
-    report_title = st.text_input("Titre du rapport", "Rapport d'Analyse Climatique")
-    include_code = st.checkbox("Inclure le code source", value=False)
+    with col_right:
+        st.markdown("##### ⚙️ Options avancées")
+        report_title = st.text_input("Titre du rapport", "Rapport d'Analyse Climatique")
+        include_code = st.checkbox("Inclure le code source", value=False)
+        
+        # Informations sur le rapport
+        st.markdown("##### 📊 Informations")
+        info_text = f"""
+        **Données disponibles :**
+        - {'✅' if has_data else '❌'} Données brutes
+        - {'✅' if has_prep else '❌'} Données prétraitées
+        - {'✅' if has_model else '❌'} Modèle entraîné
+        
+        **Sections sélectionnées :** {len(selected_sections)}/6
+        """
+        st.info(info_text)
         
     # Bouton de génération
     st.markdown("---")
     st.subheader("📤 Exporter le Rapport")
     
-    col1, col2 = st.columns([1, 2])
-    
-    with col1:
+    # Centrer le bouton de génération
+    col_generate, col_empty = st.columns([1, 1])
+    with col_generate:
         if st.button("💾 Générer le rapport HTML", type="primary", use_container_width=True):
             with st.spinner("Génération du rapport en cours..."):
                 try:
@@ -1137,9 +1156,16 @@ def page_reporting() -> None:
                     st.error(f"❌ Erreur : {str(e)}")
                     st.exception(e)  # Afficher plus de détails sur l'erreur
     
-    with col2:
+    with col_empty:
+        # Informations supplémentaires sur le rapport
+        st.markdown("##### 📝 Fonctionnalités")
         st.info("""
         **Fonctionnalités du rapport :**
+        - 📊 Visualisations interactives
+        - 📋 Tableaux de données détaillés
+        - 🎨 Design moderne et responsive
+        - 📱 Compatible mobile
+        - 🖨️ Optimisé pour l'impression
         - Personnalisation des sections incluses
         - Génération rapide même avec des données partielles
         - Aperçu intégré avant téléchargement
