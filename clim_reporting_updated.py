@@ -938,8 +938,9 @@ def show_reporting_summary(session_state: dict) -> None:
                     )
                     
                     # Aperçu intégré
-                    with st.expander("👁️ Aperçu du rapport", expanded=True):
-                        st.components.v1.html(report_content, height=800, scrolling=True)
+                    st.markdown("---")
+                    st.markdown("### 👁️ Aperçu du rapport")
+                    st.components.v1.html(report_content, height=800, scrolling=True)
                 else:
                     st.error("❌ Erreur lors de la génération du rapport")
                     

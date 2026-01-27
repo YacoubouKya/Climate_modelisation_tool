@@ -1056,8 +1056,9 @@ def page_reporting() -> None:
         return
     
     # Affichage du résumé
-    with st.expander("📊 Synthèse du Projet Climatique", expanded=True):
-        show_reporting_summary(st.session_state)
+    st.markdown("---")
+    st.subheader("📊 Synthèse du Projet Climatique")
+    show_reporting_summary(st.session_state)
     
     # Options de personnalisation du rapport
     st.markdown("---")
@@ -1081,9 +1082,10 @@ def page_reporting() -> None:
                 selected_sections.append(key)
     
     # Options avancées
-    with st.expander("⚙️ Options avancées", expanded=False):
-        report_title = st.text_input("Titre du rapport", "Rapport d'Analyse Climatique")
-        include_code = st.checkbox("Inclure le code source", value=False)
+    st.markdown("---")
+    st.subheader("⚙️ Options avancées")
+    report_title = st.text_input("Titre du rapport", "Rapport d'Analyse Climatique")
+    include_code = st.checkbox("Inclure le code source", value=False)
         
     # Bouton de génération
     st.markdown("---")
@@ -1121,12 +1123,13 @@ def page_reporting() -> None:
                             )
                             
                         # Aperçu intégré
-                        with st.expander("👁️ Aperçu du rapport", expanded=False):
-                            st.components.v1.html(
-                                open(report_path, "r", encoding="utf-8").read(), 
-                                height=600, 
-                                scrolling=True
-                            )
+                        st.markdown("---")
+                        st.subheader("👁️ Aperçu du rapport")
+                        st.components.v1.html(
+                            open(report_path, "r", encoding="utf-8").read(), 
+                            height=600, 
+                            scrolling=True
+                        )
                     else:
                         st.error("❌ Erreur lors de la génération du rapport")
                         
