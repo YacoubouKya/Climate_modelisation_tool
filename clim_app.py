@@ -22,7 +22,7 @@ try:
     import clim_preprocessing
     import clim_modeling
     import clim_evaluation
-    import clim_reporting
+    from clim_reporting_updated import show_reporting_summary, generate_html_report
     import clim_maps
     import clim_model_comparison
     from clim_data_utils import merge_dataframes
@@ -197,6 +197,19 @@ def _inject_custom_css() -> None:
 
 def main() -> None:
     _inject_custom_css()
+    
+    # Initialisation des clés de session_state si elles n'existent pas
+    if 'initialized' not in st.session_state:
+        st.session_state.update({
+            'initialized': True,
+            'clim_data': None,
+            'clim_data_prep': None,
+            'clim_prep_info': {},
+            'clim_model_info': {},
+            'project_framing': {},
+            'data_sources': {}
+        })
+    
     # Header HTML fixé en haut, comme pour l'app principale
     st.markdown(
         """
@@ -1031,11 +1044,69 @@ def page_maps() -> None:
 
 
 def page_reporting() -> None:
-    st.header(" Reporting Climat")
-    clim_reporting.show_reporting_summary(st.session_state)
+    st.header("📊 Reporting Climat")
+    
+    # Vérification des données nécessaires
+    required_keys = ["clim_data", "clim_data_prep", "clim_prep_info", 
+                   "clim_model_info", "project_framing", "data_sources"]
+    
+    missing_keys = [key for key in required_keys if key not in st.session_state]
+    
+    if missing_keys:
+        st.warning("⚠️ Certaines données nécessaires au rapport sont manquantes :")
+        st.write(missing_keys)
+        st.info("Veuillez compléter les étapes précédentes (chargement, prétraitement, modélisation).")
+        return
+    
+    # Affichage du rapport
+    with st.expander("📊 Synthèse du Projet Climatique", expanded=True):
+        show_reporting_summary(st.session_state)
+    
+    # Section de génération du rapport HTML
+    st.markdown("---")
+    st.subheader("📤 Exporter le Rapport Complet")
+    
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        if st.button("💾 Générer le rapport HTML", use_container_width=True):
+            with st.spinner("Génération du rapport en cours..."):
+                try:
+                    report_path = generate_html_report(st.session_state)
+                    if report_path:
+                        st.success("✅ Rapport généré avec succès !")
+                        
+                        # Affichage du bouton de téléchargement
+                        with open(report_path, "rb") as f:
+                            st.download_button(
+                                label="📥 Télécharger le rapport complet",
+                                data=f,
+                                file_name=os.path.basename(report_path),
+                                mime="text/html",
+                                use_container_width=True
+                            )
+                            
+                        # Aperçu intégré
+                        with st.expander("👁️ Aperçu du rapport", expanded=False):
+                            st.components.v1.html(open(report_path, "r", encoding="utf-8").read(), 
+                                               height=600, scrolling=True)
+                    else:
+                        st.error("❌ Erreur lors de la génération du rapport")
+                        
+                except Exception as e:
+                    st.error(f"❌ Erreur : {str(e)}")
+    
+    with col2:
+        st.info("""
+        **Fonctionnalités du rapport :**
+        - Synthèse complète du projet
+        - Analyse exploratoire des données
+        - Détails du prétraitement
+        - Performance du modèle
+        - Visualisations interactives
+        - Recommandations
+        """)
 
 
 if __name__ == "__main__":  # pragma: no cover
     main()
-
-
