@@ -15,6 +15,7 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 import altair as alt
+import os
 
 # Imports des modules avec gestion d'erreur
 try:
@@ -1175,3 +1176,4 @@ def page_reporting() -> None:
 
 if __name__ == "__main__":  # pragma: no cover
     main()
+
