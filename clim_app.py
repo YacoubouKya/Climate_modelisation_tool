@@ -1046,65 +1046,101 @@ def page_maps() -> None:
 def page_reporting() -> None:
     st.header("📊 Reporting Climat")
     
-    # Vérification des données nécessaires
-    required_keys = ["clim_data", "clim_data_prep", "clim_prep_info", 
-                   "clim_model_info", "project_framing", "data_sources"]
+    # Vérification des données disponibles
+    has_data = "clim_data" in st.session_state and st.session_state["clim_data"] is not None
+    has_prep = "clim_data_prep" in st.session_state and st.session_state["clim_data_prep"] is not None
+    has_model = "clim_model_info" in st.session_state and st.session_state["clim_model_info"]
     
-    missing_keys = [key for key in required_keys if key not in st.session_state]
-    
-    if missing_keys:
-        st.warning("⚠️ Certaines données nécessaires au rapport sont manquantes :")
-        st.write(missing_keys)
-        st.info("Veuillez compléter les étapes précédentes (chargement, prétraitement, modélisation).")
+    if not has_data:
+        st.warning("⚠️ Aucune donnée n'a été chargée. Veuillez d'abord charger des données depuis l'onglet 'Chargement des Données'.")
         return
     
-    # Affichage du rapport
+    # Affichage du résumé
     with st.expander("📊 Synthèse du Projet Climatique", expanded=True):
         show_reporting_summary(st.session_state)
     
-    # Section de génération du rapport HTML
+    # Options de personnalisation du rapport
     st.markdown("---")
-    st.subheader("📤 Exporter le Rapport Complet")
+    st.subheader("⚙️ Options du Rapport")
+    
+    # Sélection des sections à inclure
+    sections = [
+        ("📋 Synthèse Exécutive", "exec_summary", True),
+        ("📊 Analyse des Données", "data_analysis", True),
+        ("🔧 Prétraitement", "preprocessing", has_prep),
+        ("🤖 Modélisation", "modeling", has_model),
+        ("📈 Visualisations", "visualizations", has_prep or has_model),
+        ("📝 Recommandations", "recommendations", True)
+    ]
+    
+    selected_sections = []
+    cols = st.columns(3)
+    for i, (name, key, enabled) in enumerate(sections):
+        with cols[i % 3]:
+            if st.checkbox(name, value=enabled, key=f"report_section_{key}", disabled=not enabled):
+                selected_sections.append(key)
+    
+    # Options avancées
+    with st.expander("⚙️ Options avancées", expanded=False):
+        report_title = st.text_input("Titre du rapport", "Rapport d'Analyse Climatique")
+        include_code = st.checkbox("Inclure le code source", value=False)
+        
+    # Bouton de génération
+    st.markdown("---")
+    st.subheader("📤 Exporter le Rapport")
     
     col1, col2 = st.columns([1, 2])
     
     with col1:
-        if st.button("💾 Générer le rapport HTML", use_container_width=True):
+        if st.button("💾 Générer le rapport HTML", type="primary", use_container_width=True):
             with st.spinner("Génération du rapport en cours..."):
                 try:
-                    report_path = generate_html_report(st.session_state)
+                    # Créer une copie du contexte avec les sections sélectionnées
+                    report_context = {
+                        **st.session_state,
+                        "report_options": {
+                            "sections": selected_sections,
+                            "title": report_title,
+                            "include_code": include_code
+                        }
+                    }
+                    
+                    report_path = generate_html_report(report_context)
                     if report_path:
                         st.success("✅ Rapport généré avec succès !")
                         
                         # Affichage du bouton de téléchargement
                         with open(report_path, "rb") as f:
                             st.download_button(
-                                label="📥 Télécharger le rapport complet",
+                                label="📥 Télécharger le rapport",
                                 data=f,
                                 file_name=os.path.basename(report_path),
                                 mime="text/html",
-                                use_container_width=True
+                                use_container_width=True,
+                                type="primary"
                             )
                             
                         # Aperçu intégré
                         with st.expander("👁️ Aperçu du rapport", expanded=False):
-                            st.components.v1.html(open(report_path, "r", encoding="utf-8").read(), 
-                                               height=600, scrolling=True)
+                            st.components.v1.html(
+                                open(report_path, "r", encoding="utf-8").read(), 
+                                height=600, 
+                                scrolling=True
+                            )
                     else:
                         st.error("❌ Erreur lors de la génération du rapport")
                         
                 except Exception as e:
                     st.error(f"❌ Erreur : {str(e)}")
+                    st.exception(e)  # Afficher plus de détails sur l'erreur
     
     with col2:
         st.info("""
         **Fonctionnalités du rapport :**
-        - Synthèse complète du projet
-        - Analyse exploratoire des données
-        - Détails du prétraitement
-        - Performance du modèle
-        - Visualisations interactives
-        - Recommandations
+        - Personnalisation des sections incluses
+        - Génération rapide même avec des données partielles
+        - Aperçu intégré avant téléchargement
+        - Options avancées de personnalisation
         """)
 
 
