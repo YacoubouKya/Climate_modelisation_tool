@@ -824,11 +824,50 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                                   if col not in [lat_col, lon_col] and 
                                   not any(geo in col.lower() for geo in ['lat', 'lon', 'x', 'y'])]
                     
+                    # Essayer de trouver la variable cible du modèle
+                    target_variable = None
+                    model_info = context.get("clim_model_info")
+                    if model_info:
+                        # 1. Dans les informations de modélisation
+                        if "target_col" in model_info:
+                            target_variable = model_info["target_col"]
+                        # 2. Dans les informations de prétraitement
+                        elif "clim_prep_info" in context:
+                            prep_info = context["clim_prep_info"]
+                            if "target_col" in prep_info:
+                                target_variable = prep_info["target_col"]
+                        # 3. Chercher des colonnes typiques de target
+                        else:
+                            typical_targets = ['target', 'label', 'y', 'outcome', 'risk', 'temperature', 'temp', 
+                                             'precipitation', 'rain', 'humidity', 'wind', 'pressure', 'sea_level']
+                            for target in typical_targets:
+                                if target in climate_vars:
+                                    target_variable = target
+                                    break
+                    
+                    # Mettre la variable cible en premier si elle existe
+                    if target_variable and target_variable in climate_vars:
+                        climate_vars.remove(target_variable)
+                        climate_vars.insert(0, target_variable)
+                    
                     parts.append("<h3>🗺️ Cartes Interactives</h3>")
+                    
+                    # Afficher la variable cible détectée
+                    if target_variable:
+                        parts.append(f"""
+                        <div class='info-box'>
+                            <h4>🎯 Variable Cible du Modèle Détectée</h4>
+                            <p><strong>Variable utilisée pour la cartographie thématique :</strong> <code>{target_variable}</code></p>
+                            <p><em>C'est la variable que le modèle a appris à prédire. Elle sera utilisée par défaut pour colorer les points sur la carte.</em></p>
+                        </div>
+                        """)
+                    
                     parts.append("<p><strong>Variables climatiques disponibles pour la coloration :</strong></p>")
                     parts.append("<ul>")
-                    for var in climate_vars[:5]:  # Limiter à 5 variables
-                        parts.append(f"<li><strong>{var}</strong></li>")
+                    for i, var in enumerate(climate_vars[:5]):  # Limiter à 5 variables
+                        is_target = (var == target_variable)
+                        target_indicator = " 🎯 (cible du modèle)" if is_target else ""
+                        parts.append(f"<li><strong>{var}</strong>{target_indicator}</li>")
                     if len(climate_vars) > 5:
                         parts.append(f"<li><em>... et {len(climate_vars) - 5} autres</em></li>")
                     parts.append("</ul>")
@@ -1255,6 +1294,7 @@ def show_climate_reporting_summary(session_state: dict) -> None:
         # Détecter les variables climatiques disponibles
         df = session_state.get("clim_data")
         climate_vars_for_selection = []
+        target_variable = None  # Variable cible du modèle
         
         if isinstance(df, pd.DataFrame):
             # Identifier les colonnes géospatiales
@@ -1269,24 +1309,60 @@ def show_climate_reporting_summary(session_state: dict) -> None:
             climate_vars_for_selection = [col for col in numeric_cols 
                                          if col not in geo_cols and 
                                          not any(geo in col.lower() for geo in ['lat', 'lon', 'x', 'y'])]
+            
+            # Essayer de trouver la variable cible du modèle
+            model_info = session_state.get("clim_model_info")
+            if model_info:
+                # Chercher dans différentes sources la variable cible
+                # 1. Dans les informations de modélisation
+                if "target_col" in model_info:
+                    target_variable = model_info["target_col"]
+                # 2. Dans les informations de prétraitement
+                elif "clim_prep_info" in session_state:
+                    prep_info = session_state["clim_prep_info"]
+                    if "target_col" in prep_info:
+                        target_variable = prep_info["target_col"]
+                # 3. Chercher des colonnes typiques de target
+                else:
+                    typical_targets = ['target', 'label', 'y', 'outcome', 'risk', 'temperature', 'temp', 
+                                     'precipitation', 'rain', 'humidity', 'wind', 'pressure', 'sea_level']
+                    for target in typical_targets:
+                        if target in climate_vars_for_selection:
+                            target_variable = target
+                            break
         
         if climate_vars_for_selection:
+            # Mettre la variable cible en premier si elle existe
+            if target_variable and target_variable in climate_vars_for_selection:
+                climate_vars_for_selection.remove(target_variable)
+                climate_vars_for_selection.insert(0, target_variable)
+            
+            # Index par défaut : 0 (variable cible si trouvée, sinon première variable)
+            default_index = 0
+            
             selected_climate_var = st.selectbox(
                 "Variable pour la carte thématique",
                 options=climate_vars_for_selection,
-                index=0,
-                help="Sélectionnez la variable climatique à utiliser pour colorer les points sur la carte thématique"
+                index=default_index,
+                help="Sélectionnez la variable climatique à utiliser pour colorer les points sur la carte thématique. La variable cible du modèle est sélectionnée par défaut."
             )
             
             # Afficher les statistiques de la variable sélectionnée
             if selected_climate_var in df.columns:
                 var_data = df[selected_climate_var].dropna()
                 if len(var_data) > 0:
+                    # Indiquer si c'est la variable cible du modèle
+                    is_target = (selected_climate_var == target_variable)
+                    target_indicator = " 🎯 (Variable cible du modèle)" if is_target else ""
+                    
                     st.markdown(f"""
-                    <div style='background-color: #f0f2f6; padding: 10px; border-radius: 5px; font-size: 12px;'>
-                        <strong>📊 {selected_climate_var}</strong><br>
+                    <div style='background-color: #{"e8f4f8" if is_target else "#f0f2f6"}; 
+                                padding: 10px; border-radius: 5px; font-size: 12px; 
+                                border-left: 4px solid #{"1f77b4" if is_target else "#666"};'>
+                        <strong>📊 {selected_climate_var}{target_indicator}</strong><br>
                         Min: {var_data.min():.2f} | Max: {var_data.max():.2f}<br>
                         Moyenne: {var_data.mean():.2f} | Médiane: {var_data.median():.2f}
+                        {f"<br><em>Variable utilisée pour entraîner le modèle</em>" if is_target else ""}
                     </div>
                     """, unsafe_allow_html=True)
         else:
