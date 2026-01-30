@@ -1192,10 +1192,19 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                                         weight=2
                                     ).add_to(m3)
                             
-                            # Ajouter des contrôles de couches
-                            folium.TileLayer('OpenStreetMap').add_to(m3)
-                            folium.TileLayer('Stamen Terrain').add_to(m3)
-                            folium.TileLayer('CartoDB positron').add_to(m3)
+                            # Ajouter des contrôles de couches avec attributions
+                            folium.TileLayer(
+                                tiles='OpenStreetMap',
+                                attr='© OpenStreetMap contributors'
+                            ).add_to(m3)
+                            folium.TileLayer(
+                                tiles='Stamen Terrain',
+                                attr='Map tiles by Stamen Design, under CC BY 3.0'
+                            ).add_to(m3)
+                            folium.TileLayer(
+                                tiles='CartoDB positron',
+                                attr='© CartoDB'
+                            ).add_to(m3)
                             folium.LayerControl().add_to(m3)
                             
                             map_html3 = m3._repr_html_()
