@@ -179,27 +179,91 @@ def show_evaluation(info: dict) -> None:
                 </div>
                 """, unsafe_allow_html=True)
     
-    # Afficher le nom du modèle avec un design amélioré
+    # Afficher le nom du modèle avec un design spectaculaire
     st.markdown("---")
     model_name = info.get("model_name", "N/A")
     cv_scores = info.get("cv_scores")
     
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.markdown(f"""
-        <div style="padding: 20px; background: linear-gradient(135deg, #e8f4f8 0%, #d1e8f5 100%); border-radius: 15px; border-left: 5px solid #1f77b4; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
-            <div style="font-size: 16px; color: #666; margin-bottom: 8px; font-weight: 600;">MODÈLE UTILISÉ</div>
-            <div style="font-size: 20px; font-weight: bold; color: #1f77b4;">{model_name}</div>
+    # Section principale du modèle
+    st.markdown("""
+    <div style="text-align: center; margin-bottom: 30px;">
+        <div style="display: inline-block; padding: 8px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 20px; font-size: 14px; font-weight: 600; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);">
+            🤖 INFORMATIONS DU MODÈLE
         </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2 = st.columns([3, 2])
+    
+    with col1:
+        # Carte principale du modèle
+        st.markdown(f"""
+        <div style="padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 20px; box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3); position: relative; overflow: hidden;">
+            <div style="position: absolute; top: -50%; right: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);"></div>
+            <div style="position: relative; z-index: 1;">
+                <div style="font-size: 18px; color: rgba(255,255,255,0.9); margin-bottom: 12px; font-weight: 600; letter-spacing: 1px;">ALGORITHME UTILISÉ</div>
+                <div style="font-size: 32px; font-weight: bold; color: #ffffff; margin-bottom: 15px; text-shadow: 0 2px 10px rgba(0,0,0,0.2);">{model_name}</div>
+                <div style="display: flex; align-items: center; justify-content: flex-start; margin-top: 20px;">
+                    <div style="width: 12px; height: 12px; background: #4ade80; border-radius: 50%; margin-right: 10px; animation: pulse 2s infinite;"></div>
+                    <div style="font-size: 14px; color: rgba(255,255,255,0.8);">Modèle entraîné et prêt</div>
+                </div>
+            </div>
+        </div>
+        <style>
+        @keyframes pulse {{
+            0% {{ opacity: 1; transform: scale(1); }}
+            50% {{ opacity: 0.7; transform: scale(1.1); }}
+            100% {{ opacity: 1; transform: scale(1); }}
+        }}
+        </style>
         """, unsafe_allow_html=True)
     
     with col2:
         if cv_scores is not None and len(cv_scores) > 0:
+            # Carte des scores de validation
+            cv_mean = cv_scores.mean()
+            cv_std = cv_scores.std()
+            cv_min = cv_scores.min()
+            cv_max = cv_scores.max()
+            
             st.markdown(f"""
-            <div style="padding: 20px; background: linear-gradient(135deg, #f0f8e8 0%, #e1f2d1 100%); border-radius: 15px; border-left: 5px solid #2ca02c; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
-                <div style="font-size: 14px; color: #666; margin-bottom: 8px; font-weight: 600;">CV SCORE</div>
-                <div style="font-size: 18px; font-weight: bold; color: #2ca02c;">{cv_scores.mean():.4f} ± {cv_scores.std():.4f}</div>
-                <div style="font-size: 12px; color: #888; margin-top: 5px;">Validation croisée</div>
+            <div style="padding: 25px; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); border-radius: 20px; box-shadow: 0 8px 25px rgba(67, 233, 123, 0.3); position: relative; overflow: hidden;">
+                <div style="position: absolute; top: -30%; left: -30%; width: 160%; height: 160%; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);"></div>
+                <div style="position: relative; z-index: 1;">
+                    <div style="font-size: 16px; color: rgba(255,255,255,0.9); margin-bottom: 15px; font-weight: 600; letter-spacing: 1px;">VALIDATION CROISÉE</div>
+                    
+                    <div style="background: rgba(255,255,255,0.2); border-radius: 12px; padding: 15px; margin-bottom: 15px; backdrop-filter: blur(10px);">
+                        <div style="font-size: 28px; font-weight: bold; color: #ffffff; text-align: center; margin-bottom: 8px;">{cv_mean:.4f}</div>
+                        <div style="font-size: 12px; color: rgba(255,255,255,0.8); text-align: center;">Score moyen</div>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 12px; color: rgba(255,255,255,0.9);">
+                        <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 8px; text-align: center;">
+                            <div style="font-weight: 600;">± {cv_std:.4f}</div>
+                            <div style="font-size: 10px; opacity: 0.8;">Écart-type</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 8px; text-align: center;">
+                            <div style="font-weight: 600;">{len(cv_scores)} folds</div>
+                            <div style="font-size: 10px; opacity: 0.8;">Validations</div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 12px; padding: 8px; background: rgba(255,255,255,0.1); border-radius: 8px; font-size: 11px; color: rgba(255,255,255,0.8); text-align: center;">
+                        Plage: {cv_min:.4f} - {cv_max:.4f}
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            # Carte alternative si pas de CV
+            st.markdown(f"""
+            <div style="padding: 25px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border-radius: 20px; box-shadow: 0 8px 25px rgba(240, 147, 251, 0.3); position: relative; overflow: hidden;">
+                <div style="position: absolute; top: -30%; left: -30%; width: 160%; height: 160%; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);"></div>
+                <div style="position: relative; z-index: 1; text-align: center;">
+                    <div style="font-size: 16px; color: rgba(255,255,255,0.9); margin-bottom: 15px; font-weight: 600;">STATUT</div>
+                    <div style="font-size: 18px; font-weight: bold; color: #ffffff; margin-bottom: 10px;">Entraînement simple</div>
+                    <div style="font-size: 12px; color: rgba(255,255,255,0.8);">Pas de validation croisée</div>
+                </div>
             </div>
             """, unsafe_allow_html=True)
 
