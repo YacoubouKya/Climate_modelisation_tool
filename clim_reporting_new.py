@@ -1389,6 +1389,7 @@ def show_climate_reporting_summary(session_state: dict) -> None:
                                          not any(geo in col.lower() for geo in ['lat', 'lon', 'x', 'y'])]
             
             # Essayer de trouver la variable cible du modèle
+            target_variable = None
             model_info = session_state.get("clim_model_info")
             if model_info:
                 # Chercher dans différentes sources la variable cible
@@ -1408,6 +1409,14 @@ def show_climate_reporting_summary(session_state: dict) -> None:
                         if target in climate_vars_for_selection:
                             target_variable = target
                             break
+            else:
+                # Pas de model_info, chercher dans les colonnes typiques
+                typical_targets = ['target', 'label', 'y', 'outcome', 'risk', 'temperature', 'temp', 
+                                 'precipitation', 'rain', 'humidity', 'wind', 'pressure', 'sea_level']
+                for target in typical_targets:
+                    if target in climate_vars_for_selection:
+                        target_variable = target
+                        break
         
         if climate_vars_for_selection:
             # Mettre la variable cible en premier si elle existe
