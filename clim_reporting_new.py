@@ -1624,13 +1624,13 @@ def show_climate_reporting_summary(session_state: dict) -> None:
                     target_indicator = " 🎯 (Variable cible du modèle)" if is_target else ""
                     
                     st.markdown(f"""
-                    <div style='background-color: #{"e8f4f8" if is_target else "#f0f2f6"}; 
-                                padding: 10px; border-radius: 5px; font-size: 12px; 
-                                border-left: 4px solid #{"1f77b4" if is_target else "#666"};'>
-                        <strong>📊 {selected_climate_var}{target_indicator}</strong><br>
+                    <div style='background-color: #{"2c3e50" if is_target else "#34495e"}; 
+                                color: white; padding: 12px; border-radius: 5px; font-size: 13px; 
+                                border-left: 4px solid #{"3498db" if is_target else "#95a5a6"};'>
+                        <strong style='color: white;'>📊 {selected_climate_var}{target_indicator}</strong><br>
                         Min: {var_data.min():.2f} | Max: {var_data.max():.2f}<br>
                         Moyenne: {var_data.mean():.2f} | Médiane: {var_data.median():.2f}
-                        {f"<br><em>Variable utilisée pour entraîner le modèle</em>" if is_target else ""}
+                        {f"<br><em style='color: #ecf0f1;'>Variable utilisée pour entraîner le modèle</em>" if is_target else ""}
                     </div>
                     """, unsafe_allow_html=True)
         else:
