@@ -78,7 +78,7 @@ def show_evaluation(info: dict) -> None:
 
     st.subheader("📊 Résultats globaux")
     
-    # Afficher les 4 métriques principales selon le type de tâche
+    # Afficher les 4 métriques principales selon le type de tâche avec un design amélioré
     if task_type == "classification":
         col1, col2, col3, col4 = st.columns(4)
         
@@ -86,9 +86,10 @@ def show_evaluation(info: dict) -> None:
         with col1:
             if metric_value is not None:
                 st.markdown(f"""
-                <div style="text-align: center; padding: 10px; background-color: #f0f2f6; border-radius: 10px;">
-                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">ACCURACY</div>
-                    <div style="font-size: 20px; font-weight: bold; color: #1f77b4;">{metric_value:.4f}</div>
+                <div style="text-align: center; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                    <div style="font-size: 14px; color: #ffffff; margin-bottom: 8px; font-weight: 600;">ACCURACY</div>
+                    <div style="font-size: 28px; font-weight: bold; color: #ffffff;">{metric_value:.4f}</div>
+                    <div style="font-size: 12px; color: #e0e0e0; margin-top: 5px;">Performance globale</div>
                 </div>
                 """, unsafe_allow_html=True)
         
@@ -97,9 +98,10 @@ def show_evaluation(info: dict) -> None:
             f1_score = info.get("f1_score")
             if f1_score is not None:
                 st.markdown(f"""
-                <div style="text-align: center; padding: 10px; background-color: #f0f2f6; border-radius: 10px;">
-                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">F1-SCORE</div>
-                    <div style="font-size: 20px; font-weight: bold; color: #ff7f0e;">{f1_score:.4f}</div>
+                <div style="text-align: center; padding: 15px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                    <div style="font-size: 14px; color: #ffffff; margin-bottom: 8px; font-weight: 600;">F1-SCORE</div>
+                    <div style="font-size: 28px; font-weight: bold; color: #ffffff;">{f1_score:.4f}</div>
+                    <div style="font-size: 12px; color: #e0e0e0; margin-top: 5px;">Balance précision/rappel</div>
                 </div>
                 """, unsafe_allow_html=True)
         
@@ -108,9 +110,10 @@ def show_evaluation(info: dict) -> None:
             precision = info.get("precision")
             if precision is not None:
                 st.markdown(f"""
-                <div style="text-align: center; padding: 10px; background-color: #f0f2f6; border-radius: 10px;">
-                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">PRECISION</div>
-                    <div style="font-size: 20px; font-weight: bold; color: #2ca02c;">{precision:.4f}</div>
+                <div style="text-align: center; padding: 15px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                    <div style="font-size: 14px; color: #ffffff; margin-bottom: 8px; font-weight: 600;">PRECISION</div>
+                    <div style="font-size: 28px; font-weight: bold; color: #ffffff;">{precision:.4f}</div>
+                    <div style="font-size: 12px; color: #e0e0e0; margin-top: 5px;">Prédictions positives</div>
                 </div>
                 """, unsafe_allow_html=True)
         
@@ -119,9 +122,10 @@ def show_evaluation(info: dict) -> None:
             recall = info.get("recall")
             if recall is not None:
                 st.markdown(f"""
-                <div style="text-align: center; padding: 10px; background-color: #f0f2f6; border-radius: 10px;">
-                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">RECALL</div>
-                    <div style="font-size: 20px; font-weight: bold; color: #d62728;">{recall:.4f}</div>
+                <div style="text-align: center; padding: 15px; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                    <div style="font-size: 14px; color: #ffffff; margin-bottom: 8px; font-weight: 600;">RECALL</div>
+                    <div style="font-size: 28px; font-weight: bold; color: #ffffff;">{recall:.4f}</div>
+                    <div style="font-size: 12px; color: #e0e0e0; margin-top: 5px;">Détection positive</div>
                 </div>
                 """, unsafe_allow_html=True)
     
@@ -132,9 +136,10 @@ def show_evaluation(info: dict) -> None:
         with col1:
             if metric_value is not None:
                 st.markdown(f"""
-                <div style="text-align: center; padding: 10px; background-color: #f0f2f6; border-radius: 10px;">
-                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">RMSE</div>
-                    <div style="font-size: 20px; font-weight: bold; color: #1f77b4;">{metric_value:.4f}</div>
+                <div style="text-align: center; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                    <div style="font-size: 14px; color: #ffffff; margin-bottom: 8px; font-weight: 600;">RMSE</div>
+                    <div style="font-size: 28px; font-weight: bold; color: #ffffff;">{metric_value:.4f}</div>
+                    <div style="font-size: 12px; color: #e0e0e0; margin-top: 5px;">Erreur quadratique</div>
                 </div>
                 """, unsafe_allow_html=True)
         
@@ -143,9 +148,10 @@ def show_evaluation(info: dict) -> None:
             mse = info.get("mse")
             if mse is not None:
                 st.markdown(f"""
-                <div style="text-align: center; padding: 10px; background-color: #f0f2f6; border-radius: 10px;">
-                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">MSE</div>
-                    <div style="font-size: 20px; font-weight: bold; color: #ff7f0e;">{mse:.4f}</div>
+                <div style="text-align: center; padding: 15px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                    <div style="font-size: 14px; color: #ffffff; margin-bottom: 8px; font-weight: 600;">MSE</div>
+                    <div style="font-size: 28px; font-weight: bold; color: #ffffff;">{mse:.4f}</div>
+                    <div style="font-size: 12px; color: #e0e0e0; margin-top: 5px;">Erreur moyenne</div>
                 </div>
                 """, unsafe_allow_html=True)
         
@@ -154,9 +160,10 @@ def show_evaluation(info: dict) -> None:
             mae = info.get("mae")
             if mae is not None:
                 st.markdown(f"""
-                <div style="text-align: center; padding: 10px; background-color: #f0f2f6; border-radius: 10px;">
-                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">MAE</div>
-                    <div style="font-size: 20px; font-weight: bold; color: #2ca02c;">{mae:.4f}</div>
+                <div style="text-align: center; padding: 15px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                    <div style="font-size: 14px; color: #ffffff; margin-bottom: 8px; font-weight: 600;">MAE</div>
+                    <div style="font-size: 28px; font-weight: bold; color: #ffffff;">{mae:.4f}</div>
+                    <div style="font-size: 12px; color: #e0e0e0; margin-top: 5px;">Erreur absolue</div>
                 </div>
                 """, unsafe_allow_html=True)
         
@@ -165,13 +172,14 @@ def show_evaluation(info: dict) -> None:
             r2 = info.get("r2")
             if r2 is not None:
                 st.markdown(f"""
-                <div style="text-align: center; padding: 10px; background-color: #f0f2f6; border-radius: 10px;">
-                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">R²</div>
-                    <div style="font-size: 20px; font-weight: bold; color: #d62728;">{r2:.4f}</div>
+                <div style="text-align: center; padding: 15px; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                    <div style="font-size: 14px; color: #ffffff; margin-bottom: 8px; font-weight: 600;">R²</div>
+                    <div style="font-size: 28px; font-weight: bold; color: #ffffff;">{r2:.4f}</div>
+                    <div style="font-size: 12px; color: #e0e0e0; margin-top: 5px;">Qualité d'ajustement</div>
                 </div>
                 """, unsafe_allow_html=True)
     
-    # Afficher le nom du modèle avec une taille de police appropriée
+    # Afficher le nom du modèle avec un design amélioré
     st.markdown("---")
     model_name = info.get("model_name", "N/A")
     cv_scores = info.get("cv_scores")
@@ -179,18 +187,19 @@ def show_evaluation(info: dict) -> None:
     col1, col2 = st.columns([2, 1])
     with col1:
         st.markdown(f"""
-        <div style="padding: 10px; background-color: #e8f4f8; border-radius: 10px; border-left: 4px solid #1f77b4;">
-            <div style="font-size: 14px; color: #666; margin-bottom: 5px;">MODÈLE UTILISÉ</div>
-            <div style="font-size: 16px; font-weight: bold; color: #333;">{model_name}</div>
+        <div style="padding: 20px; background: linear-gradient(135deg, #e8f4f8 0%, #d1e8f5 100%); border-radius: 15px; border-left: 5px solid #1f77b4; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+            <div style="font-size: 16px; color: #666; margin-bottom: 8px; font-weight: 600;">MODÈLE UTILISÉ</div>
+            <div style="font-size: 20px; font-weight: bold; color: #1f77b4;">{model_name}</div>
         </div>
         """, unsafe_allow_html=True)
     
     with col2:
         if cv_scores is not None and len(cv_scores) > 0:
             st.markdown(f"""
-            <div style="padding: 10px; background-color: #f0f8e8; border-radius: 10px; border-left: 4px solid #2ca02c;">
-                <div style="font-size: 12px; color: #666; margin-bottom: 5px;">CV SCORE</div>
-                <div style="font-size: 14px; font-weight: bold; color: #333;">{cv_scores.mean():.4f} ± {cv_scores.std():.4f}</div>
+            <div style="padding: 20px; background: linear-gradient(135deg, #f0f8e8 0%, #e1f2d1 100%); border-radius: 15px; border-left: 5px solid #2ca02c; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+                <div style="font-size: 14px; color: #666; margin-bottom: 8px; font-weight: 600;">CV SCORE</div>
+                <div style="font-size: 18px; font-weight: bold; color: #2ca02c;">{cv_scores.mean():.4f} ± {cv_scores.std():.4f}</div>
+                <div style="font-size: 12px; color: #888; margin-top: 5px;">Validation croisée</div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -211,21 +220,44 @@ def show_evaluation(info: dict) -> None:
         ax.set_ylabel("Valeurs réelles")
         st.pyplot(fig)
         
-        # Métriques détaillées
+        # Métriques détaillées avec design amélioré
         st.subheader("📊 Métriques détaillées")
         try:
             precision = precision_score(y_test, y_pred, average="weighted", zero_division=0)
             recall = recall_score(y_test, y_pred, average="weighted", zero_division=0)
+            
+            # Affichage des métriques avec un design moderne
             col1, col2 = st.columns(2)
             with col1:
-                st.metric("Precision (weighted)", f"{precision:.4f}")
-            with col2:
-                st.metric("Recall (weighted)", f"{recall:.4f}")
+                st.markdown(f"""
+                <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                    <div style="font-size: 16px; color: #ffffff; margin-bottom: 10px; font-weight: 600;">PRECISION (WEIGHTED)</div>
+                    <div style="font-size: 32px; font-weight: bold; color: #ffffff;">{precision:.4f}</div>
+                    <div style="font-size: 14px; color: #e0e0e0; margin-top: 8px;">Qualité des prédictions positives</div>
+                </div>
+                """, unsafe_allow_html=True)
             
-            # Rapport de classification
+            with col2:
+                st.markdown(f"""
+                <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                    <div style="font-size: 16px; color: #ffffff; margin-bottom: 10px; font-weight: 600;">RECALL (WEIGHTED)</div>
+                    <div style="font-size: 32px; font-weight: bold; color: #ffffff;">{recall:.4f}</div>
+                    <div style="font-size: 14px; color: #e0e0e0; margin-top: 8px;">Taux de détection positif</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Rapport de classification avec un meilleur affichage
+            st.markdown("### 📋 Rapport de Classification Détaillé")
             report = classification_report(y_test, y_pred, output_dict=True, zero_division=0)
             report_df = pd.DataFrame(report).transpose()
-            st.dataframe(report_df, use_container_width=True)
+            
+            # Améliorer l'affichage du dataframe
+            st.dataframe(
+                report_df.round(4), 
+                use_container_width=True,
+                height=400,
+                hide_index=True
+            )
         except Exception as e:
             st.warning(f"Impossible de calculer les métriques détaillées : {e}")
         
