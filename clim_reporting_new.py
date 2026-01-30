@@ -465,7 +465,7 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
     report_title = report_options.get("title", "Rapport d'Analyse de Risque Climatique")
     include_code = report_options.get("include_code", False)
     
-    if not df and not data_sources:
+    if (df is None or (isinstance(df, pd.DataFrame) and df.empty)) and not data_sources:
         return None
     
     # Génération du nom du fichier
