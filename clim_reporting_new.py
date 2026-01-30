@@ -872,40 +872,82 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                         parts.append(f"<li><em>... et {len(climate_vars) - 5} autres</em></li>")
                     parts.append("</ul>")
                     
-                    # === CARTE 1: Points de Base ===
-                    parts.append("<h4>📍 Carte des Points de Données</h4>")
+                    # === CARTE 1: Points de Base Colorés par Variable Cible ===
+                    parts.append("<h4>📍 Carte des Points avec Variable Cible</h4>")
                     m1 = folium.Map(location=[center_lat, center_lon], zoom_start=10)
                     
-                    # Ajouter les points avec popup améliorés
-                    sample_data = df[[lat_col, lon_col]].dropna().head(200)  # Limiter à 200 points
-                    for idx, row in sample_data.iterrows():
-                        popup_text = f"""
-                        <b>Point #{idx}</b><br>
-                        <b>Latitude:</b> {row[lat_col]:.4f}<br>
-                        <b>Longitude:</b> {row[lon_col]:.4f}
-                        """
-                        folium.CircleMarker(
-                            location=[row[lat_col], row[lon_col]],
-                            radius=4,
-                            popup=folium.Popup(popup_text, max_width=200),
-                            tooltip=f"Point {idx}",
-                            color='#1f77b4',
-                            fill=True,
-                            fillColor='#1f77b4',
-                            fillOpacity=0.7
-                        ).add_to(m1)
+                    # Utiliser la variable cible pour colorer les points
+                    if target_variable and target_variable in df.columns:
+                        target_data = df[[lat_col, lon_col, target_variable]].dropna().head(200)
+                        if len(target_data) > 0:
+                            # Créer une colormap simple pour la variable cible
+                            min_val = target_data[target_variable].min()
+                            max_val = target_data[target_variable].max()
+                            colormap = cm.LinearColormap(['blue', 'green', 'yellow', 'red'], 
+                                                         vmin=min_val, vmax=max_val)
+                            
+                            for idx, row in target_data.iterrows():
+                                color = colormap(row[target_variable])
+                                popup_text = f"""
+                                <b>Point #{idx}</b><br>
+                                <b>Latitude:</b> {row[lat_col]:.4f}<br>
+                                <b>Longitude:</b> {row[lon_col]:.4f}<br>
+                                <b>{target_variable}:</b> {row[target_variable]:.2f}
+                                """
+                                folium.CircleMarker(
+                                    location=[row[lat_col], row[lon_col]],
+                                    radius=4,
+                                    popup=folium.Popup(popup_text, max_width=200),
+                                    tooltip=f"{target_variable}: {row[target_variable]:.2f}",
+                                    color=color,
+                                    fill=True,
+                                    fillColor=color,
+                                    fillOpacity=0.7
+                                ).add_to(m1)
+                            
+                            # Ajouter la colormap à la carte
+                            m1.add_child(colormap)
+                        else:
+                            # Pas de données valides pour la variable cible
+                            sample_data = df[[lat_col, lon_col]].dropna().head(200)
+                            for idx, row in sample_data.iterrows():
+                                folium.CircleMarker(
+                                    location=[row[lat_col], row[lon_col]],
+                                    radius=4,
+                                    popup=f"Point #{idx}",
+                                    tooltip=f"Point {idx}",
+                                    color='#1f77b4',
+                                    fill=True,
+                                    fillColor='#1f77b4',
+                                    fillOpacity=0.7
+                                ).add_to(m1)
+                    else:
+                        # Pas de variable cible, utiliser les points de base
+                        sample_data = df[[lat_col, lon_col]].dropna().head(200)
+                        for idx, row in sample_data.iterrows():
+                            folium.CircleMarker(
+                                location=[row[lat_col], row[lon_col]],
+                                radius=4,
+                                popup=f"Point #{idx}",
+                                tooltip=f"Point {idx}",
+                                color='#1f77b4',
+                                fill=True,
+                                fillColor='#1f77b4',
+                                fillOpacity=0.7
+                            ).add_to(m1)
                     
                     # Ajouter une légende
-                    legend_html = '''
+                    legend_html = f'''
                     <div style="position: fixed; 
-                                bottom: 50px; left: 50px; width: 150px; height: 90px; 
+                                bottom: 50px; left: 50px; width: 180px; height: 110px; 
                                 background-color: white; border:2px solid grey; z-index:9999; 
                                 font-size:14px; padding: 10px">
                     <p><b>Légende</b></p>
                     <p><i class="fa fa-circle" style="color:#1f77b4"></i> Points de données</p>
-                    <p><small>Total: {} points</small></p>
+                    <p><small>Colorés par: {target_variable if target_variable else 'Pas de variable cible'}</small></p>
+                    <p><small>Total: {len(df)} points</small></p>
                     </div>
-                    '''.format(len(sample_data))
+                    '''
                     m1.get_root().html.add_child(folium.Element(legend_html))
                     
                     map_html1 = m1._repr_html_()
@@ -1050,7 +1092,7 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                             # Informations détaillées sur la variable utilisée
                             parts.append(f"""
                             <div class='info-box'>
-                                <h5>📊 Variable Sélectionnée : {color_var}</h5>
+                                <h5>📊 Variable Cible : {target_variable if target_variable else 'Non spécifiée'}</h5>
                                 <div class='grid-2'>
                                     <div>
                                         <p><strong>Plage de valeurs :</strong> {min_val:.2f} - {max_val:.2f}</p>
@@ -1060,10 +1102,10 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                                     <div>
                                         <p><strong>Écart-type :</strong> {var_data.std():.2f}</p>
                                         <p><strong>Nombre de points :</strong> {len(var_data):,}</p>
-                                        <p><strong>Valeurs manquantes :</strong> {df[color_var].isna().sum()}</p>
+                                        <p><strong>Valeurs manquantes :</strong> {df[target_variable].isna().sum() if target_variable else 0}</p>
                                     </div>
                                 </div>
-                                <p><em>💡 Les points sont colorés et dimensionnés selon la valeur de cette variable. Utilisez les contrôles en haut à droite pour changer le fond de carte.</em></p>
+                                <p><em>💡 Les points sont colorés et dimensionnés selon la valeur de la variable cible du modèle. Utilisez les contrôles en haut à droite pour changer le fond de carte.</em></p>
                             </div>
                             """)
                             
@@ -1084,42 +1126,78 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                             parts.append(f"""
                                 <div class='warning-box'>
                                     <h5>⚠️ Données Insuffisantes</h5>
-                                    <p>La variable '{color_var}' ne contient pas assez de données valides pour créer une carte thématique.</p>
+                                    <p>La variable cible '{target_variable if target_variable else 'spécifiée'}' ne contient pas assez de données valides pour créer une carte thématique.</p>
                                     <p>Points disponibles : {len(var_data)} / {len(df)}</p>
                                 </div>
                             """)
                     
-                    # === CARTE 4: Clustering ===
+                    # === CARTE 4: Clustering avec Variable Cible ===
                     if len(valid_data) > 50:
-                        parts.append("<h4>🔗 Carte avec Clustering</h4>")
+                        parts.append("<h4>🔗 Carte avec Clustering et Variable Cible</h4>")
                         m4 = folium.Map(location=[center_lat, center_lon], zoom_start=10)
                         
                         # Créer un cluster de marqueurs
                         marker_cluster = MarkerCluster(name='Clusters de points')
                         
-                        cluster_data = df[[lat_col, lon_col]].dropna().head(500)  # Plus de points pour le clustering
-                        for idx, row in cluster_data.iterrows():
-                            popup_text = f"""
-                            <b>Point #{idx}</b><br>
-                            <b>Latitude:</b> {row[lat_col]:.4f}<br>
-                            <b>Longitude:</b> {row[lon_col]:.4f}
-                            """
-                            folium.Marker(
-                                location=[row[lat_col], row[lon_col]],
-                                popup=folium.Popup(popup_text, max_width=200),
-                                tooltip=f"Cluster Point {idx}"
-                            ).add_to(marker_cluster)
+                        # Utiliser la variable cible pour les clusters si disponible
+                        if target_variable and target_variable in df.columns:
+                            cluster_data = df[[lat_col, lon_col, target_variable]].dropna().head(500)
+                            if len(cluster_data) > 0:
+                                # Créer une colormap pour la variable cible
+                                min_val = cluster_data[target_variable].min()
+                                max_val = cluster_data[target_variable].max()
+                                colormap = cm.LinearColormap(['blue', 'green', 'yellow', 'red'], 
+                                                             vmin=min_val, vmax=max_val)
+                                
+                                for idx, row in cluster_data.iterrows():
+                                    color = colormap(row[target_variable])
+                                    popup_text = f"""
+                                    <div style='width: 200px;'>
+                                        <h5>Point #{idx}</h5>
+                                        <p><strong>Latitude:</strong> {row[lat_col]:.4f}</p>
+                                        <p><strong>Longitude:</strong> {row[lon_col]:.4f}</p>
+                                        <p><strong>{target_variable}:</strong> <span style='color: {color}; font-weight: bold;'>{row[target_variable]:.2f}</span></p>
+                                    </div>
+                                    """
+                                    folium.Marker(
+                                        location=[row[lat_col], row[lon_col]],
+                                        popup=folium.Popup(popup_text, max_width=250),
+                                        tooltip=f"{target_variable}: {row[target_variable]:.2f}",
+                                        icon=folium.Icon(color='blue', icon='info-sign')
+                                    ).add_to(marker_cluster)
+                                
+                                # Ajouter la colormap à la carte
+                                m4.add_child(colormap)
+                            else:
+                                # Pas de données valides, utiliser les marqueurs standards
+                                cluster_data = df[[lat_col, lon_col]].dropna().head(500)
+                                for idx, row in cluster_data.iterrows():
+                                    folium.Marker(
+                                        location=[row[lat_col], row[lon_col]],
+                                        popup=f"Point #{idx}",
+                                        tooltip=f"Cluster Point {idx}"
+                                    ).add_to(marker_cluster)
+                        else:
+                            # Pas de variable cible, utiliser les marqueurs standards
+                            cluster_data = df[[lat_col, lon_col]].dropna().head(500)
+                            for idx, row in cluster_data.iterrows():
+                                folium.Marker(
+                                    location=[row[lat_col], row[lon_col]],
+                                    popup=f"Point #{idx}",
+                                    tooltip=f"Cluster Point {idx}"
+                                ).add_to(marker_cluster)
                         
                         marker_cluster.add_to(m4)
                         
                         # Légende pour le clustering
-                        legend_html4 = '''
+                        legend_html4 = f'''
                         <div style="position: fixed; 
-                                    bottom: 50px; left: 50px; width: 200px; height: 90px; 
+                                    bottom: 50px; left: 50px; width: 220px; height: 110px; 
                                     background-color: white; border:2px solid grey; z-index:9999; 
                                     font-size:14px; padding: 10px">
                         <p><b>Clustering</b></p>
                         <p><i class="fa fa-map-marker"></i> Points regroupés</p>
+                        <p><small>Variable: {target_variable if target_variable else 'Non spécifiée'}</small></p>
                         <p><small>Zoomez pour voir les détails</small></p>
                         </div>
                         '''
