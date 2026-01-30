@@ -827,6 +827,8 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                     # Essayer de trouver la variable cible du modèle
                     target_variable = None
                     model_info = session_state.get("clim_model_info")
+                    
+                    # Debug: Afficher les informations disponibles
                     if model_info:
                         # 1. Dans les informations de modélisation
                         if "target_col" in model_info:
@@ -844,6 +846,14 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                                 if target in climate_vars:
                                     target_variable = target
                                     break
+                    else:
+                        # Pas de model_info, chercher dans les colonnes typiques
+                        typical_targets = ['target', 'label', 'y', 'outcome', 'risk', 'temperature', 'temp', 
+                                         'precipitation', 'rain', 'humidity', 'wind', 'pressure', 'sea_level']
+                        for target in typical_targets:
+                            if target in climate_vars:
+                                target_variable = target
+                                break
                     
                     # Mettre la variable cible en premier si elle existe
                     if target_variable and target_variable in climate_vars:
@@ -859,6 +869,16 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                             <h4>🎯 Variable Cible du Modèle Détectée</h4>
                             <p><strong>Variable utilisée pour la cartographie thématique :</strong> <code>{target_variable}</code></p>
                             <p><em>C'est la variable que le modèle a appris à prédire. Elle sera utilisée par défaut pour colorer les points sur la carte.</em></p>
+                        </div>
+                        """)
+                    else:
+                        # Afficher un message d'aide si aucune variable cible n'est détectée
+                        parts.append(f"""
+                        <div class='warning-box'>
+                            <h4>🔍 Variable Cible Non Détectée Automatiquement</h4>
+                            <p><strong>Variables climatiques disponibles ({len(climate_vars)}) :</strong></p>
+                            <p>{', '.join(climate_vars[:5])}{'...' if len(climate_vars) > 5 else ''}</p>
+                            <p><em>Pour une meilleure expérience, entraînez d'abord un modèle avec une variable cible clairement nommée (ex: 'target', 'temperature', 'risk', etc.).</em></p>
                         </div>
                         """)
                     
