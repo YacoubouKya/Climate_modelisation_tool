@@ -663,14 +663,14 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                 imp_df = pd.DataFrame(importance_data)
                 parts.append(_wrap_table(imp_df.to_html(classes='dataframe dataframe', index=False)))
                 
-                # Graphique d'importance
-                if not selected_sections or "visualizations" in selected_sections:
-                    try:
-                        imp_fig = _create_feature_importance_plot(feat_names, feat_imp)
-                        if imp_fig:
-                            parts.append(_img_to_base64(imp_fig))
-                    except Exception as e:
-                        parts.append(f"<div class='warning-box'>Erreur lors de la génération du graphique d'importance: {str(e)}</div>")
+                # Graphique d'importance (déplacé dans la section modeling)
+                try:
+                    imp_fig = _create_feature_importance_plot(feat_names, feat_imp)
+                    if imp_fig:
+                        parts.append("<h4>Graphique d'importance des features</h4>")
+                        parts.append(_img_to_base64(imp_fig))
+                except Exception as e:
+                    parts.append(f"<div class='warning-box'>Erreur lors de la génération du graphique d'importance: {str(e)}</div>")
     
     # Section 4: Évaluation des performances
     if model_info and (not selected_sections or "visualizations" in selected_sections):

@@ -183,6 +183,8 @@ def run_climate_modeling(
         "X_test": X_test,
         "y_train": y_train,
         "y_test": y_test,
+        "train_shape": X_train.shape,
+        "test_shape": X_test.shape,
         "task_type": task_type,
         "used_stratify": used_stratify,
         "model_name": model_name,
