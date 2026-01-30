@@ -826,14 +826,14 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                     
                     # Essayer de trouver la variable cible du modèle
                     target_variable = None
-                    model_info = context.get("clim_model_info")
+                    model_info = session_state.get("clim_model_info")
                     if model_info:
                         # 1. Dans les informations de modélisation
                         if "target_col" in model_info:
                             target_variable = model_info["target_col"]
                         # 2. Dans les informations de prétraitement
-                        elif "clim_prep_info" in context:
-                            prep_info = context["clim_prep_info"]
+                        elif "clim_prep_info" in session_state:
+                            prep_info = session_state["clim_prep_info"]
                             if "target_col" in prep_info:
                                 target_variable = prep_info["target_col"]
                         # 3. Chercher des colonnes typiques de target
@@ -978,8 +978,8 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                         # Utiliser la variable sélectionnée (par défaut la première)
                         # Récupérer la variable sélectionnée depuis les options du rapport
                         selected_climate_var = None
-                        if "report_options" in context and "selected_climate_var" in context["report_options"]:
-                            selected_climate_var = context["report_options"]["selected_climate_var"]
+                        if "report_options" in session_state and "selected_climate_var" in session_state["report_options"]:
+                            selected_climate_var = session_state["report_options"]["selected_climate_var"]
                         
                         # Si une variable est sélectionnée et existe dans les données, l'utiliser
                         if selected_climate_var and selected_climate_var in climate_vars:
