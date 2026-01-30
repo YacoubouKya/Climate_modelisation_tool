@@ -701,6 +701,7 @@ def page_modeling() -> None:
                         "model_name": result["model_name"],
                         "metric_name": result["metric_name"],
                         "metric_value": result["test_score"],
+                        "target_col": target_col,  # Ajout de la variable cible
                         # Métriques de classification
                         "f1_score": result.get("f1_score"),
                         "precision": result.get("precision"),
@@ -770,6 +771,7 @@ def page_modeling() -> None:
                             "model_name": best_result["model_name"],
                             "metric_name": best_result["metric_name"],
                             "metric_value": best_result["test_score"],
+                            "target_col": target_col,  # Ajout de la variable cible
                             # Métriques de classification
                             "f1_score": best_result.get("f1_score"),
                             "precision": best_result.get("precision"),
@@ -910,6 +912,7 @@ def page_modeling() -> None:
                                 "model_name": f"{tuned_result['model_name']} (Affiné)",
                                 "metric_name": tuned_result["metric_name"],
                                 "metric_value": tuned_result["test_score"],
+                                "target_col": target_col,  # Ajout de la variable cible
                                 # Métriques de classification
                                 "f1_score": tuned_result.get("f1_score"),
                                 "precision": tuned_result.get("precision"),
