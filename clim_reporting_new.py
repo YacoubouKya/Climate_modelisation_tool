@@ -750,9 +750,9 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
         except Exception as e:
             parts.append(f"<div class='warning-box'>Erreur lors de la génération des graphiques d'évaluation: {str(e)}</div>")
     
-    # Section 5: Cartographie (dernière carte tracée)
+    # Section 5: Cartographie Avancée
     if not selected_sections or "cartography" in selected_sections:
-        parts.append("<h2>5. Cartographie et Analyse Spatiale</h2>")
+        parts.append("<h2>5. Cartographie et Analyse Spatiale Avancée</h2>")
         
         # Vérifier si des données géospatiales sont disponibles
         has_geo_data = False
@@ -768,73 +768,285 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
         
         if has_geo_data:
             parts.append("<div class='info-box'>")
-            parts.append("<h3>Données géospatiales détectées</h3>")
-            parts.append(f"<p>Colonnes géographiques trouvées : {', '.join(geo_cols)}</p>")
+            parts.append("<h3>📍 Données Géospatiales Détectées</h3>")
+            parts.append(f"<p><strong>Colonnes géographiques :</strong> {', '.join(geo_cols)}</p>")
+            parts.append(f"<p><strong>Nombre de points :</strong> {len(df):,}</p>")
             
-            # Statistiques géospatiales
-            parts.append("<h4>Statistiques géospatiales</h4>")
+            # Statistiques géospatiales détaillées
+            parts.append("<h4>📊 Statistiques Géospatiales</h4>")
+            parts.append("<div class='grid-2'>")
             for col in geo_cols[:4]:  # Limiter à 4 colonnes
                 if col in df.columns:
                     stats = df[col].describe()
                     parts.append(f"""
-                        <div class='metric-box'>
-                            <span class='metric-label'>{col}</span>
-                            <span class='metric-value'>{stats['mean']:.4f}</span>
+                        <div class='card'>
+                            <h5>{col}</h5>
+                            <p><strong>Moyenne :</strong> {stats['mean']:.4f}</p>
+                            <p><strong>Min :</strong> {stats['min']:.4f}</p>
+                            <p><strong>Max :</strong> {stats['max']:.4f}</p>
+                            <p><strong>Écart-type :</strong> {stats['std']:.4f}</p>
                         </div>
                     """)
-            
+            parts.append("</div>")
             parts.append("</div>")
             
-            # Essayer de créer une carte
+            # Créer les cartes avancées
             try:
                 import folium
+                from folium.plugins import HeatMap, MarkerCluster
+                import branca.colormap as cm
                 
-                if len(geo_cols) >= 2:
-                    lat_col = geo_cols[0] if 'lat' in geo_cols[0].lower() else geo_cols[1]
-                    lon_col = geo_cols[1] if 'lon' in geo_cols[1].lower() else geo_cols[0]
+                # Identifier les colonnes latitude/longitude
+                lat_col = None
+                lon_col = None
+                for col in geo_cols:
+                    col_lower = col.lower()
+                    if 'lat' in col_lower and lat_col is None:
+                        lat_col = col
+                    elif 'lon' in col_lower and lon_col is None:
+                        lon_col = col
+                
+                # Si pas trouvé, utiliser les deux premières
+                if lat_col is None or lon_col is None:
+                    lat_col = geo_cols[0]
+                    lon_col = geo_cols[1] if len(geo_cols) > 1 else geo_cols[0]
+                
+                # Préparer les données
+                valid_data = df[[lat_col, lon_col]].dropna()
+                if len(valid_data) > 0:
+                    center_lat = valid_data[lat_col].mean()
+                    center_lon = valid_data[lon_col].mean()
                     
-                    # Calculer le centre
-                    valid_data = df[[lat_col, lon_col]].dropna()
-                    if len(valid_data) > 0:
-                        center_lat = valid_data[lat_col].mean()
-                        center_lon = valid_data[lon_col].mean()
+                    # Identifier les variables climatiques pour la coloration
+                    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+                    # Exclure les colonnes de coordonnées
+                    climate_vars = [col for col in numeric_cols 
+                                  if col not in [lat_col, lon_col] and 
+                                  not any(geo in col.lower() for geo in ['lat', 'lon', 'x', 'y'])]
+                    
+                    parts.append("<h3>🗺️ Cartes Interactives</h3>")
+                    parts.append("<p><strong>Variables climatiques disponibles pour la coloration :</strong></p>")
+                    parts.append("<ul>")
+                    for var in climate_vars[:5]:  # Limiter à 5 variables
+                        parts.append(f"<li><strong>{var}</strong></li>")
+                    if len(climate_vars) > 5:
+                        parts.append(f"<li><em>... et {len(climate_vars) - 5} autres</em></li>")
+                    parts.append("</ul>")
+                    
+                    # === CARTE 1: Points de Base ===
+                    parts.append("<h4>📍 Carte des Points de Données</h4>")
+                    m1 = folium.Map(location=[center_lat, center_lon], zoom_start=10)
+                    
+                    # Ajouter les points avec popup améliorés
+                    sample_data = df[[lat_col, lon_col]].dropna().head(200)  # Limiter à 200 points
+                    for idx, row in sample_data.iterrows():
+                        popup_text = f"""
+                        <b>Point #{idx}</b><br>
+                        <b>Latitude:</b> {row[lat_col]:.4f}<br>
+                        <b>Longitude:</b> {row[lon_col]:.4f}
+                        """
+                        folium.CircleMarker(
+                            location=[row[lat_col], row[lon_col]],
+                            radius=4,
+                            popup=folium.Popup(popup_text, max_width=200),
+                            tooltip=f"Point {idx}",
+                            color='#1f77b4',
+                            fill=True,
+                            fillColor='#1f77b4',
+                            fillOpacity=0.7
+                        ).add_to(m1)
+                    
+                    # Ajouter une légende
+                    legend_html = '''
+                    <div style="position: fixed; 
+                                bottom: 50px; left: 50px; width: 150px; height: 90px; 
+                                background-color: white; border:2px solid grey; z-index:9999; 
+                                font-size:14px; padding: 10px">
+                    <p><b>Légende</b></p>
+                    <p><i class="fa fa-circle" style="color:#1f77b4"></i> Points de données</p>
+                    <p><small>Total: {} points</small></p>
+                    </div>
+                    '''.format(len(sample_data))
+                    m1.get_root().html.add_child(folium.Element(legend_html))
+                    
+                    map_html1 = m1._repr_html_()
+                    parts.append("<div class='figure-container'>")
+                    parts.append(map_html1)
+                    parts.append("</div>")
+                    
+                    # === CARTE 2: Heat Map ===
+                    if len(valid_data) > 10:
+                        parts.append("<h4>🔥 Carte de Densité (Heat Map)</h4>")
+                        m2 = folium.Map(location=[center_lat, center_lon], zoom_start=10)
                         
-                        # Créer la carte
-                        m = folium.Map(location=[center_lat, center_lon], zoom_start=10)
+                        # Préparer les données pour la heat map
+                        heat_data = [[row[lat_col], row[lon_col]] for idx, row in valid_data.iterrows()]
+                        HeatMap(heat_data, 
+                               radius=15, 
+                               blur=10, 
+                               gradient={0.2: 'blue', 0.4: 'cyan', 0.6: 'lime', 0.8: 'yellow', 1: 'red'},
+                               name='Densité des points').add_to(m2)
                         
-                        # Ajouter des points pour les 100 premières observations
-                        sample_data = valid_data.head(100)
-                        for idx, row in sample_data.iterrows():
-                            folium.CircleMarker(
-                                location=[row[lat_col], row[lon_col]],
-                                radius=5,
-                                popup=f"Point {idx}",
-                                color='#667eea',
-                                fill=True,
-                                fillColor='#667eea'
-                            ).add_to(m)
+                        # Légende pour la heat map
+                        legend_html2 = '''
+                        <div style="position: fixed; 
+                                    bottom: 50px; left: 50px; width: 180px; height: 110px; 
+                                    background-color: white; border:2px solid grey; z-index:9999; 
+                                    font-size:14px; padding: 10px">
+                        <p><b>Densité</b></p>
+                        <div style="background: linear-gradient(to right, blue, cyan, lime, yellow, red); height: 20px;"></div>
+                        <p><small>Faible → Élevée</small></p>
+                        <p><small>Points: {}</small></p>
+                        </div>
+                        '''.format(len(heat_data))
+                        m2.get_root().html.add_child(folium.Element(legend_html2))
                         
-                        # Sauvegarder la carte
-                        map_html = m._repr_html_()
+                        map_html2 = m2._repr_html_()
                         parts.append("<div class='figure-container'>")
-                        parts.append(map_html)
+                        parts.append(map_html2)
                         parts.append("</div>")
+                    
+                    # === CARTE 3: Points Colorés par Variable Climatique ===
+                    if climate_vars:
+                        parts.append("<h4>🌡️ Carte Thématique par Variable Climatique</h4>")
                         
+                        # Utiliser la première variable climatique disponible
+                        color_var = climate_vars[0]
+                        m3 = folium.Map(location=[center_lat, center_lon], zoom_start=10)
+                        
+                        # Créer une colormap
+                        var_data = df[color_var].dropna()
+                        if len(var_data) > 0:
+                            min_val = var_data.min()
+                            max_val = var_data.max()
+                            
+                            # Créer une colormap
+                            colormap = cm.LinearColormap(['blue', 'green', 'yellow', 'red'], 
+                                                         vmin=min_val, vmax=max_val)
+                            colormap.caption = f'{color_var} ({min_val:.2f} - {max_val:.2f})'
+                            
+                            # Ajouter les points colorés
+                            color_data = df[[lat_col, lon_col, color_var]].dropna().head(200)
+                            for idx, row in color_data.iterrows():
+                                color = colormap(row[color_var])
+                                popup_text = f"""
+                                <b>Point #{idx}</b><br>
+                                <b>Latitude:</b> {row[lat_col]:.4f}<br>
+                                <b>Longitude:</b> {row[lon_col]:.4f}<br>
+                                <b>{color_var}:</b> {row[color_var]:.2f}
+                                """
+                                folium.CircleMarker(
+                                    location=[row[lat_col], row[lon_col]],
+                                    radius=5,
+                                    popup=folium.Popup(popup_text, max_width=250),
+                                    tooltip=f"{color_var}: {row[color_var]:.2f}",
+                                    color=color,
+                                    fill=True,
+                                    fillColor=color,
+                                    fillOpacity=0.8
+                                ).add_to(m3)
+                            
+                            # Ajouter la colormap à la carte
+                            m3.add_child(colormap)
+                            
+                            map_html3 = m3._repr_html_()
+                            parts.append("<div class='figure-container'>")
+                            parts.append(map_html3)
+                            parts.append("</div>")
+                            
+                            # Informations sur la variable utilisée
+                            parts.append(f"""
+                            <div class='info-box'>
+                                <h5>📊 Variable Utilisée : {color_var}</h5>
+                                <p><strong>Plage de valeurs :</strong> {min_val:.2f} - {max_val:.2f}</p>
+                                <p><strong>Moyenne :</strong> {var_data.mean():.2f}</p>
+                                <p><strong>Écart-type :</strong> {var_data.std():.2f}</p>
+                                <p><em>Les points sont colorés selon la valeur de cette variable</em></p>
+                            </div>
+                            """)
+                    
+                    # === CARTE 4: Clustering ===
+                    if len(valid_data) > 50:
+                        parts.append("<h4>🔗 Carte avec Clustering</h4>")
+                        m4 = folium.Map(location=[center_lat, center_lon], zoom_start=10)
+                        
+                        # Créer un cluster de marqueurs
+                        marker_cluster = MarkerCluster(name='Clusters de points')
+                        
+                        cluster_data = df[[lat_col, lon_col]].dropna().head(500)  # Plus de points pour le clustering
+                        for idx, row in cluster_data.iterrows():
+                            popup_text = f"""
+                            <b>Point #{idx}</b><br>
+                            <b>Latitude:</b> {row[lat_col]:.4f}<br>
+                            <b>Longitude:</b> {row[lon_col]:.4f}
+                            """
+                            folium.Marker(
+                                location=[row[lat_col], row[lon_col]],
+                                popup=folium.Popup(popup_text, max_width=200),
+                                tooltip=f"Cluster Point {idx}"
+                            ).add_to(marker_cluster)
+                        
+                        marker_cluster.add_to(m4)
+                        
+                        # Légende pour le clustering
+                        legend_html4 = '''
+                        <div style="position: fixed; 
+                                    bottom: 50px; left: 50px; width: 200px; height: 90px; 
+                                    background-color: white; border:2px solid grey; z-index:9999; 
+                                    font-size:14px; padding: 10px">
+                        <p><b>Clustering</b></p>
+                        <p><i class="fa fa-map-marker"></i> Points regroupés</p>
+                        <p><small>Zoomez pour voir les détails</small></p>
+                        </div>
+                        '''
+                        m4.get_root().html.add_child(folium.Element(legend_html4))
+                        
+                        map_html4 = m4._repr_html_()
+                        parts.append("<div class='figure-container'>")
+                        parts.append(map_html4)
+                        parts.append("</div>")
+                    
+                    # Section d'analyse spatiale
+                    parts.append("<h3>📈 Analyse Spatiale</h3>")
+                    parts.append("<div class='info-box'>")
+                    parts.append("<h4>🔍 Options d'Analyse Disponibles</h4>")
+                    parts.append("<ul>")
+                    parts.append("<li><strong>Filtres par période :</strong> Si des données temporelles sont disponibles</li>")
+                    parts.append("<li><strong>Analyse par clusters :</strong> Identification des zones de concentration</li>")
+                    parts.append("<li><strong>Corrélation spatiale :</strong> Analyse des patterns géographiques</li>")
+                    parts.append("<li><strong>Interpolation spatiale :</strong> Estimation des valeurs entre les points</li>")
+                    parts.append("</ul>")
+                    parts.append("</div>")
+                    
             except ImportError:
                 parts.append("""
                     <div class='warning-box'>
-                        <h4>Bibliothèque cartographique non disponible</h4>
-                        <p>Pour afficher les cartes, installez la bibliothèque folium : pip install folium</p>
+                        <h4>📚 Bibliothèques Cartographiques Non Disponibles</h4>
+                        <p>Pour afficher les cartes interactives, installez les bibliothèques requises :</p>
+                        <code>pip install folium branca</code>
+                        <p>Les bibliothèques folium et branca sont nécessaires pour la visualisation cartographique avancée.</p>
                     </div>
                 """)
             except Exception as e:
-                parts.append(f"<div class='warning-box'>Erreur lors de la génération de la carte: {str(e)}</div>")
+                parts.append(f"""
+                    <div class='warning-box'>
+                        <h4>⚠️ Erreur lors de la génération des cartes</h4>
+                        <p>Une erreur s'est produite : {str(e)}</p>
+                        <p>Vérifiez que vos données géospatiales sont correctement formatées.</p>
+                    </div>
+                """)
         else:
             parts.append("""
                 <div class='warning-box'>
-                    <h4>Aucune donnée géospatiale détectée</h4>
-                    <p>Pour inclure des cartes dans le rapport, assurez-vous que vos données contiennent des colonnes de coordonnées (latitude/longitude).</p>
-                    <p>Colonnes attendues : latitude, longitude, lat, lon, x, y</p>
+                    <h4>🗺️ Aucune Donnée Géospatiale Détectée</h4>
+                    <p>Pour inclure des cartes dans le rapport, assurez-vous que vos données contiennent des colonnes de coordonnées.</p>
+                    <p><strong>Colonnes attendues :</strong></p>
+                    <ul>
+                        <li>latitude, longitude</li>
+                        <li>lat, lon</li>
+                        <li>x, y</li>
+                    </ul>
+                    <p><em>Les noms de colonnes peuvent être en majuscules ou minuscules.</em></p>
                 </div>
             """)
     
