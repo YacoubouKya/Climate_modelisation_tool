@@ -244,19 +244,19 @@ def main() -> None:
         ],
     )
 
-    if section == "Cadrage du Projet":
+    if section == " Cadrage du Projet":
         page_framing()
-    elif section == "Chargement":
+    elif section == " Chargement":
         page_loading()
-    elif section == "EDA Climatique":
+    elif section == " EDA Climatique":
         page_eda()
-    elif section == "Prétraitement Climat":
+    elif section == " Prétraitement Climat":
         page_preprocessing()
-    elif section == "Modélisation du Risque":
+    elif section == " Modélisation du Risque":
         page_modeling()
-    elif section == "Évaluation & Scénarios":
+    elif section == " Évaluation & Scénarios":
         page_evaluation()
-    elif section == "Cartographie du Risque":
+    elif section == " Cartographie du Risque":
         page_maps()
     else:
         page_reporting()
@@ -265,7 +265,7 @@ def main() -> None:
 def page_framing() -> None:
     """Page de cadrage du projet climat : objectif, unité d'analyse, cible."""
 
-    st.header("Cadrage du Projet Climat")
+    st.header(" Cadrage du Projet Climat")
     st.markdown(
         """Définissez clairement l'objectif métier et le périmètre de votre analyse 
         avant de charger et traiter les données. Ces informations seront reprises dans le rapport final."""
@@ -319,7 +319,7 @@ def page_framing() -> None:
     # Afficher le cadrage actuel si déjà enregistré
     if "project_framing" in st.session_state:
         st.markdown("---")
-        st.subheader("**Cadrage actuel**")
+        st.subheader("📋 Cadrage actuel")
         framing = st.session_state["project_framing"]
         st.markdown(f"**Type d'objectif :** {framing['objective_type']}")
         if framing["objective_desc"]:
@@ -402,7 +402,7 @@ def _select_data_source() -> pd.DataFrame:
 
 
 def page_loading() -> None:
-    st.header("Chargement des données (multi-sources)")
+    st.header("📥 Chargement des données (multi-sources)")
     st.markdown(
         """Chargez plusieurs fichiers (climat, géographie, exposition, événements) 
         et labelisez-les pour les fusionner plus tard dans le prétraitement."""
@@ -468,12 +468,12 @@ def page_loading() -> None:
 
 
 def page_eda() -> None:
-    st.header("EDA Climatique")
+    st.header("🔎 EDA Climatique")
     
     # Sélection de la source
     df = _select_data_source()
     if df is None:
-        st.warning("Veuillez d'abord charger des données dans l'onglet  Chargement.")
+        st.warning("Veuillez d'abord charger des données dans l'onglet 📥 Chargement.")
         return
 
     st.subheader("Aperçu général")
@@ -526,12 +526,12 @@ def page_eda() -> None:
 
 
 def page_preprocessing() -> None:
-    st.header("Prétraitement Climat")
+    st.header(" Prétraitement Climat")
     
     # Sélection de la source (comme dans EDA)
     df = _select_data_source()
     if df is None:
-        st.warning("Veuillez d'abord charger des données dans l'onglet  Chargement.")
+        st.warning("Veuillez d'abord charger des données dans l'onglet 📥 Chargement.")
         return
 
     st.subheader("Paramètres de prétraitement")
@@ -680,12 +680,12 @@ def page_preprocessing() -> None:
 
 
 def page_modeling() -> None:
-    st.header("Modélisation du Risque Climatique")
+    st.header(" Modélisation du Risque Climatique")
     
     # Sélection de la source de données
     df = _select_data_source()
     if df is None or df.empty:
-        st.warning("Veuillez d'abord charger des données dans l'onglet Chargement.")
+        st.warning("Veuillez d'abord charger des données dans l'onglet 📥 Chargement.")
         return
 
     # Configuration de base
@@ -711,7 +711,7 @@ def page_modeling() -> None:
 
     # Choix du mode
     st.markdown("---")
-    st.subheader("Mode de modélisation")
+    st.subheader("🔧 Mode de modélisation")
     modeling_mode = st.radio(
         "Choisissez votre approche",
         ["Modèle unique", "Comparaison de modèles", "Affiner le meilleur modèle"],
@@ -877,7 +877,7 @@ def page_modeling() -> None:
                 with col3:
                     min_samples_split = st.slider("min_samples_split", 2, 20, default_min_samples_split, 1, key="tune_min_split")
                 
-                if st.button("Affiner le modèle"):
+                if st.button("🚀 Affiner le modèle"):
                     with st.spinner("Réentraînement avec les nouveaux hyperparamètres..."):
                         # Récupérer le type de tâche
                         task_type = st.session_state.get("clim_model_info", {}).get("task_type", detected_task)
@@ -921,7 +921,7 @@ def page_modeling() -> None:
                             
                             # Comparer avec le modèle de base
                             st.markdown("---")
-                            st.subheader("Résultats de l'affinage")
+                            st.subheader("📊 Résultats de l'affinage")
                             
                             col1, col2, col3 = st.columns(3)
                             with col1:
@@ -970,7 +970,7 @@ def page_modeling() -> None:
                 with col3:
                     max_depth = st.slider("max_depth", 3, 10, 3, 1, key="tune_gb_depth")
                 
-                if st.button("Affiner le modèle"):
+                if st.button("🚀 Affiner le modèle"):
                     st.info("Affinage Gradient Boosting en cours...")
                     # Logique similaire pour GB
                     st.warning("Implémentation complète à venir pour Gradient Boosting")
@@ -1046,7 +1046,7 @@ def page_maps() -> None:
 
 def page_reporting() -> None:
     """Page de reporting avec interface améliorée"""
-    st.header("Reporting Climat")
+    st.header("📊 Reporting Climat")
     
     # Vérification des données disponibles
     has_data = "clim_data" in st.session_state and st.session_state["clim_data"] is not None
@@ -1059,12 +1059,12 @@ def page_reporting() -> None:
     
     # Affichage du résumé
     st.markdown("---")
-    st.subheader("Synthèse du Projet Climatique")
+    st.subheader("📊 Synthèse du Projet Climatique")
     show_reporting_summary(st.session_state)
     
     # Options de personnalisation du rapport
     st.markdown("---")
-    st.subheader("Configuration du Rapport")
+    st.subheader("⚙️ Configuration du Rapport")
     
     # Organisation en colonnes pour une meilleure présentation
     col_left, col_right = st.columns([2, 1])
@@ -1096,7 +1096,7 @@ def page_reporting() -> None:
         include_code = st.checkbox("Inclure le code source", value=False)
         
         # Informations sur le rapport
-        st.markdown("##### Informations")
+        st.markdown("##### 📊 Informations")
         info_text = f"""
         **Données disponibles :**
         - {'✅' if has_data else '❌'} Données brutes
@@ -1109,7 +1109,7 @@ def page_reporting() -> None:
         
     # Bouton de génération
     st.markdown("---")
-    st.subheader("Exporter le Rapport")
+    st.subheader("📤 Exporter le Rapport")
     
     # Centrer le bouton de génération
     col_generate, col_empty = st.columns([1, 1])
@@ -1134,7 +1134,7 @@ def page_reporting() -> None:
                         # Affichage du bouton de téléchargement
                         with open(report_path, "rb") as f:
                             st.download_button(
-                                label="Télécharger le rapport",
+                                label="📥 Télécharger le rapport",
                                 data=f,
                                 file_name=os.path.basename(report_path),
                                 mime="text/html",
@@ -1144,7 +1144,7 @@ def page_reporting() -> None:
                             
                         # Aperçu intégré
                         st.markdown("---")
-                        st.subheader("Aperçu du rapport")
+                        st.subheader("👁️ Aperçu du rapport")
                         st.components.v1.html(
                             open(report_path, "r", encoding="utf-8").read(), 
                             height=600, 
@@ -1162,11 +1162,11 @@ def page_reporting() -> None:
         st.markdown("##### 📝 Fonctionnalités")
         st.info("""
         **Fonctionnalités du rapport :**
-        - Visualisations interactives
-        - Tableaux de données détaillés
-        - Design moderne et responsive
-        - Compatible mobile
-        - Optimisé pour l'impression
+        - 📊 Visualisations interactives
+        - 📋 Tableaux de données détaillés
+        - 🎨 Design moderne et responsive
+        - 📱 Compatible mobile
+        - 🖨️ Optimisé pour l'impression
         - Personnalisation des sections incluses
         - Génération rapide même avec des données partielles
         - Aperçu intégré avant téléchargement
@@ -1176,5 +1176,4 @@ def page_reporting() -> None:
 
 if __name__ == "__main__":  # pragma: no cover
     main()
-
 
