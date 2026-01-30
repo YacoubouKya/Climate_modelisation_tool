@@ -553,22 +553,51 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
     if (bool(prep_info) or (isinstance(df_prep, pd.DataFrame) and not df_prep.empty)) and (not selected_sections or "preprocessing" in selected_sections):
         parts.append("<h2>2. Prétraitement des données</h2>")
         
+        # Dimensions avant et après prétraitement
+        if isinstance(df, pd.DataFrame) and isinstance(df_prep, pd.DataFrame):
+            parts.append("<h3>Dimensions des données</h3>")
+            parts.append("<div class='grid-2'>")
+            parts.append("<div class='card'>")
+            parts.append("<h4>Avant prétraitement</h4>")
+            parts.append(f"<p><strong>Lignes :</strong> {df.shape[0]:,}</p>")
+            parts.append(f"<p><strong>Colonnes :</strong> {df.shape[1]}</p>")
+            parts.append("</div>")
+            parts.append("<div class='card'>")
+            parts.append("<h4>Après prétraitement</h4>")
+            parts.append(f"<p><strong>Lignes :</strong> {df_prep.shape[0]:,}</p>")
+            parts.append(f"<p><strong>Colonnes :</strong> {df_prep.shape[1]}</p>")
+            parts.append(f"<p><strong>Nouvelles features :</strong> {df_prep.shape[1] - df.shape[1]}</p>")
+            parts.append("</div>")
+            parts.append("</div>")
+        
         if prep_info:
             parts.append("<div class='info-box'>")
             parts.append("<h3>Étapes de prétraitement appliquées</h3>")
             parts.append("<ul>")
             
             if prep_info.get("date_col"):
-                parts.append(f"<li>Colonne temporelle : {prep_info['date_col']}</li>")
+                parts.append(f"<li><strong>Colonne temporelle :</strong> {prep_info['date_col']}</li>")
             
-            if prep_info.get("freq"):
-                parts.append(f"<li>Fréquence d'agrégation : {prep_info['freq']}</li>")
+            if prep_info.get("freq") and prep_info.get("freq") != "Aucune":
+                parts.append(f"<li><strong>Fréquence d'agrégation :</strong> {prep_info['freq']}</li>")
             
             if prep_info.get("rolling"):
-                parts.append("<li>Calcul des indicateurs mobiles</li>")
+                parts.append("<li><strong>Calcul des indicateurs mobiles :</strong> Moyennes glissantes appliquées</li>")
             
             if prep_info.get("anomaly_summary"):
-                parts.append("<li>Détection des anomalies</li>")
+                parts.append("<li><strong>Détection des anomalies :</strong> Analyse z-score effectuée</li>")
+            
+            if prep_info.get("cumul_features"):
+                parts.append("<li><strong>Features cumulatives :</strong> Cumuls glissants ajoutés</li>")
+            
+            if prep_info.get("threshold_features"):
+                parts.append("<li><strong>Features de seuil :</strong> Comptage de jours > seuil</li>")
+            
+            if prep_info.get("ref_anomaly_features"):
+                parts.append("<li><strong>Anomalies de référence :</strong> Calcul vs période climatologique</li>")
+            
+            if prep_info.get("extreme_features"):
+                parts.append("<li><strong>Features extrêmes :</strong> Min/max glissants ajoutés</li>")
             
             parts.append("</ul>")
             parts.append("</div>")
@@ -590,21 +619,23 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
         parts.append(f"<p><strong>Tâche :</strong> {model_info.get('task_type', 'Non spécifié')}</p>")
         parts.append("</div>")
         
-        # Dimensions des ensembles
+        # Dimensions des ensembles (déplacé au début pour plus de visibilité)
         if "train_shape" in model_info and "test_shape" in model_info:
             parts.append("<h3>Dimensions des ensembles de données</h3>")
             parts.append("<div class='grid-2'>")
             parts.append("<div class='card'>")
             parts.append("<h4>Ensemble d'entraînement</h4>")
             train_shape = model_info["train_shape"]
-            parts.append(f"<p><strong>Features (X_train) :</strong> {train_shape[0]} × {train_shape[1]}</p>")
-            parts.append(f"<p><strong>Cible (y_train) :</strong> {train_shape[0]} valeurs</p>")
+            parts.append(f"<p><strong>Features (X_train) :</strong> {train_shape[0]:,} × {train_shape[1]}</p>")
+            parts.append(f"<p><strong>Cible (y_train) :</strong> {train_shape[0]:,} valeurs</p>")
+            parts.append(f"<p><strong>Ratio :</strong> {train_shape[0]/(train_shape[0] + model_info['test_shape'][0])*100:.1f}%</p>")
             parts.append("</div>")
             parts.append("<div class='card'>")
             parts.append("<h4>Ensemble de test</h4>")
             test_shape = model_info["test_shape"]
-            parts.append(f"<p><strong>Features (X_test) :</strong> {test_shape[0]} × {test_shape[1]}</p>")
-            parts.append(f"<p><strong>Cible (y_test) :</strong> {test_shape[0]} valeurs</p>")
+            parts.append(f"<p><strong>Features (X_test) :</strong> {test_shape[0]:,} × {test_shape[1]}</p>")
+            parts.append(f"<p><strong>Cible (y_test) :</strong> {test_shape[0]:,} valeurs</p>")
+            parts.append(f"<p><strong>Ratio :</strong> {test_shape[0]/(train_shape[0] + test_shape[0])*100:.1f}%</p>")
             parts.append("</div>")
             parts.append("</div>")
         
@@ -650,30 +681,65 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
         
         metrics_data = {}
         
-        if "metric_value" in model_info and model_info["metric_value"] is not None:
-            metrics_data['accuracy'] = [f"{model_info['metric_value']:.4f}"]
+        # Métriques pour classification
+        if model_info.get("task_type") == "classification":
+            if "metric_value" in model_info and model_info["metric_value"] is not None:
+                metrics_data['accuracy'] = [f"{model_info['metric_value']:.4f}"]
+            
+            if "f1_score" in model_info and model_info["f1_score"] is not None:
+                metrics_data['f1_score'] = [f"{model_info['f1_score']:.4f}"]
+            
+            if "precision" in model_info and model_info["precision"] is not None:
+                metrics_data['precision'] = [f"{model_info['precision']:.4f}"]
+            
+            if "recall" in model_info and model_info["recall"] is not None:
+                metrics_data['recall'] = [f"{model_info['recall']:.4f}"]
         
-        if "f1_score" in model_info and model_info["f1_score"] is not None:
-            metrics_data['f1_weighted'] = [f"{model_info['f1_score']:.4f}"]
-        
-        if "precision" in model_info and model_info["precision"] is not None:
-            metrics_data['precision_weighted'] = [f"{model_info['precision']:.4f}"]
-        
-        if "recall" in model_info and model_info["recall"] is not None:
-            metrics_data['recall_weighted'] = [f"{model_info['recall']:.4f}"]
-        
-        # Ajouter des métriques spécifiques à la régression si disponibles
-        if model_info.get("task_type") == "regression":
+        # Métriques pour régression
+        elif model_info.get("task_type") == "regression":
             if "mse" in model_info and model_info["mse"] is not None:
                 metrics_data['mse'] = [f"{model_info['mse']:.4f}"]
+            
             if "rmse" in model_info and model_info["rmse"] is not None:
                 metrics_data['rmse'] = [f"{model_info['rmse']:.4f}"]
+            
             if "r2" in model_info and model_info["r2"] is not None:
                 metrics_data['r2_score'] = [f"{model_info['r2']:.4f}"]
+            
+            if "mae" in model_info and model_info["mae"] is not None:
+                metrics_data['mae'] = [f"{model_info['mae']:.4f}"]
+        
+        # Métriques génériques (si task_type non spécifié)
+        else:
+            if "metric_value" in model_info and model_info["metric_value"] is not None:
+                metrics_data['score'] = [f"{model_info['metric_value']:.4f}"]
+            
+            if "mse" in model_info and model_info["mse"] is not None:
+                metrics_data['mse'] = [f"{model_info['mse']:.4f}"]
+            
+            if "rmse" in model_info and model_info["rmse"] is not None:
+                metrics_data['rmse'] = [f"{model_info['rmse']:.4f}"]
+            
+            if "r2" in model_info and model_info["r2"] is not None:
+                metrics_data['r2_score'] = [f"{model_info['r2']:.4f}"]
+            
+            if "mae" in model_info and model_info["mae"] is not None:
+                metrics_data['mae'] = [f"{model_info['mae']:.4f}"]
+            
+            if "f1_score" in model_info and model_info["f1_score"] is not None:
+                metrics_data['f1_score'] = [f"{model_info['f1_score']:.4f}"]
+            
+            if "precision" in model_info and model_info["precision"] is not None:
+                metrics_data['precision'] = [f"{model_info['precision']:.4f}"]
+            
+            if "recall" in model_info and model_info["recall"] is not None:
+                metrics_data['recall'] = [f"{model_info['recall']:.4f}"]
         
         if metrics_data:
             metrics_df = pd.DataFrame(metrics_data)
             parts.append(_wrap_table(metrics_df.to_html(classes='dataframe dataframe', index=False)))
+        else:
+            parts.append("<div class='warning-box'>Aucune métrique de performance disponible</div>")
         
         # Visualisations des performances
         parts.append("<h3>Visualisations des performances</h3>")
