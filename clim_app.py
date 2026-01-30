@@ -15,6 +15,7 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 import altair as alt
+import os
 
 # Imports des modules avec gestion d'erreur
 try:
@@ -525,8 +526,7 @@ def page_eda() -> None:
 
 
 def page_preprocessing() -> None:
-    """Page de prétraitement avec interface améliorée et sections pliables"""
-    st.header("🔧 Prétraitement Climat")
+    st.header(" Prétraitement Climat")
     
     # Sélection de la source (comme dans EDA)
     df = _select_data_source()
@@ -534,143 +534,96 @@ def page_preprocessing() -> None:
         st.warning("Veuillez d'abord charger des données dans l'onglet 📥 Chargement.")
         return
 
-    # Variables d'état pour les sections pliables
-    if 'show_basic_params' not in st.session_state:
-        st.session_state.show_basic_params = True
-    if 'show_advanced_features' not in st.session_state:
-        st.session_state.show_advanced_features = False
+    st.subheader("Paramètres de prétraitement")
+    date_col = st.selectbox("Colonne date", options=["(aucune)"] + df.columns.tolist())
+    freq = st.selectbox("Fréquence d’agrégation", options=["Aucune", "Jour", "Mois"], index=0)
 
-    # Section 1: Paramètres de base
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        st.markdown("### 📋 Paramètres de base")
-    with col2:
-        if st.button("👁️" if st.session_state.show_basic_params else "👁️‍🗨️", 
-                   help="Afficher/Masquer", key="toggle_basic"):
-            st.session_state.show_basic_params = not st.session_state.show_basic_params
+    id_cols: list[str] = []
+    st.markdown("**Colonnes d’identifiant (optionnel)**")
+    id_cols = st.multiselect(
+        "Colonnes d’identifiant (station, zone, etc.)",
+        options=df.columns.tolist(),
+    )
 
-    if st.session_state.show_basic_params:
-        st.markdown("---")
-        
-        # Paramètres principaux
+    num_cols = df.select_dtypes(include=["number"]).columns.tolist()
+
+    st.markdown("**Features temporelles avancées (optionnel)**")
+    use_rolling = st.checkbox("Ajouter des moyennes glissantes (rolling)", value=False)
+    rolling_cols = (
+        st.multiselect("Colonnes numériques à étendre", options=num_cols)
+        if use_rolling
+        else []
+    )
+
+    st.markdown("**Détection simple d'anomalies (optionnel)**")
+    use_anomaly = st.checkbox("Calculer un résumé d'outliers (z-score)", value=False)
+    anomaly_cols = (
+        st.multiselect("Colonnes numériques à analyser", options=num_cols, key="anomaly_cols_select")
+        if use_anomaly
+        else []
+    )
+
+    st.markdown("---")
+    st.subheader("🌡️ Feature Engineering Climat Avancé")
+
+    st.markdown("**Cumuls glissants (précipitations, degrés-jours, etc.)**")
+    use_cumul = st.checkbox("Ajouter des cumuls sur N jours", value=False)
+    cumul_cols = []
+    cumul_windows = [7, 30]
+    if use_cumul:
+        cumul_cols = st.multiselect("Colonnes à cumuler", options=num_cols, key="cumul_cols_select")
+        cumul_windows_str = st.text_input("Fenêtres (jours, séparées par virgule)", value="7,30")
+        cumul_windows = [int(x.strip()) for x in cumul_windows_str.split(",") if x.strip().isdigit()]
+
+    st.markdown("**Comptage de jours au-dessus d'un seuil**")
+    use_threshold = st.checkbox("Compter les jours > seuil", value=False)
+    threshold_cols = []
+    thresholds_dict = {}
+    threshold_windows = [7, 30]
+    if use_threshold:
+        threshold_cols = st.multiselect("Colonnes à analyser", options=num_cols, key="threshold_cols_select")
+        if threshold_cols:
+            st.markdown("Définir les seuils pour chaque colonne :")
+            for col in threshold_cols:
+                thresholds_dict[col] = st.number_input(f"Seuil pour {col}", value=30.0, key=f"threshold_{col}")
+            threshold_windows_str = st.text_input("Fenêtres (jours, séparées par virgule)", value="7,30", key="threshold_windows")
+            threshold_windows = [int(x.strip()) for x in threshold_windows_str.split(",") if x.strip().isdigit()]
+
+    st.markdown("**Anomalies vs période de référence climatologique**")
+    use_ref_anomaly = st.checkbox("Calculer anomalies vs référence", value=False)
+    ref_anomaly_cols = []
+    ref_start = "1990-01-01"
+    ref_end = "2020-12-31"
+    if use_ref_anomaly:
+        ref_anomaly_cols = st.multiselect("Colonnes climatiques", options=num_cols, key="ref_anomaly_cols_select")
         col1, col2 = st.columns(2)
         with col1:
-            date_col = st.selectbox("Colonne date", options=["(aucune)"] + df.columns.tolist())
+            ref_start = st.text_input("Début référence (YYYY-MM-DD)", value="1990-01-01")
         with col2:
-            freq = st.selectbox("Fréquence d'agrégation", options=["Aucune", "Jour", "Mois"], index=0)
+            ref_end = st.text_input("Fin référence (YYYY-MM-DD)", value="2020-12-31")
 
-        # Colonnes d'identifiant
-        id_cols: list[str] = []
-        st.markdown("**Colonnes d'identifiant (optionnel)**")
-        id_cols = st.multiselect(
-            "Colonnes d'identifiant (station, zone, etc.)",
-            options=df.columns.tolist(),
-        )
+    st.markdown("**Extremes glissants (min/max sur fenêtre)**")
+    use_extremes = st.checkbox("Ajouter min/max glissants", value=False)
+    extreme_cols = []
+    extreme_windows = [7, 30]
+    if use_extremes:
+        extreme_cols = st.multiselect("Colonnes à analyser", options=num_cols, key="extreme_cols_select")
+        extreme_windows_str = st.text_input("Fenêtres (jours, séparées par virgule)", value="7,30", key="extreme_windows")
+        extreme_windows = [int(x.strip()) for x in extreme_windows_str.split(",") if x.strip().isdigit()]
 
-        num_cols = df.select_dtypes(include=["number"]).columns.tolist()
-
-        # Features temporelles de base
-        st.markdown("**Features temporelles de base**")
-        use_rolling = st.checkbox("Ajouter des moyennes glissantes (rolling)", value=False)
-        rolling_cols = (
-            st.multiselect("Colonnes numériques à étendre", options=num_cols)
-            if use_rolling
-            else []
-        )
-
-        st.markdown("**Détection simple d'anomalies (optionnel)**")
-        use_anomaly = st.checkbox("Calculer un résumé d'outliers (z-score)", value=False)
-        anomaly_cols = (
-            st.multiselect("Colonnes numériques à analyser", options=num_cols, key="anomaly_cols_select")
-            if use_anomaly
-            else []
-        )
-
-    # Section 2: Feature Engineering Avancé
-    st.markdown("---")
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        st.markdown("### 🌡️ Feature Engineering Climat Avancé")
-    with col2:
-        if st.button("👁️" if st.session_state.show_advanced_features else "👁️‍🗨️", 
-                   help="Afficher/Masquer", key="toggle_advanced"):
-            st.session_state.show_advanced_features = not st.session_state.show_advanced_features
-
-    if st.session_state.show_advanced_features:
-        st.markdown("---")
-        
-        # Cumuls glissants
-        with st.container():
-            st.markdown("**📊 Cumuls glissants (précipitations, degrés-jours, etc.)**")
-            use_cumul = st.checkbox("Ajouter des cumuls sur N jours", value=False)
-            cumul_cols = []
-            cumul_windows = [7, 30]
-            if use_cumul:
-                cumul_cols = st.multiselect("Colonnes à cumuler", options=num_cols, key="cumul_cols_select")
-                cumul_windows_str = st.text_input("Fenêtres (jours, séparées par virgule)", value="7,30")
-                cumul_windows = [int(x.strip()) for x in cumul_windows_str.split(",") if x.strip().isdigit()]
-
-        # Comptage de jours au-dessus d'un seuil
-        with st.container():
-            st.markdown("**🎯 Comptage de jours au-dessus d'un seuil**")
-            use_threshold = st.checkbox("Compter les jours > seuil", value=False)
-            threshold_cols = []
-            thresholds_dict = {}
-            threshold_windows = [7, 30]
-            if use_threshold:
-                threshold_cols = st.multiselect("Colonnes à analyser", options=num_cols, key="threshold_cols_select")
-                if threshold_cols:
-                    st.markdown("Définir les seuils pour chaque colonne :")
-                    for col in threshold_cols:
-                        thresholds_dict[col] = st.number_input(f"Seuil pour {col}", value=30.0, key=f"threshold_{col}")
-                    threshold_windows_str = st.text_input("Fenêtres (jours, séparées par virgule)", value="7,30", key="threshold_windows")
-                    threshold_windows = [int(x.strip()) for x in threshold_windows_str.split(",") if x.strip().isdigit()]
-
-        # Anomalies vs période de référence
-        with st.container():
-            st.markdown("**📈 Anomalies vs période de référence climatologique**")
-            use_ref_anomaly = st.checkbox("Calculer anomalies vs référence", value=False)
-            ref_anomaly_cols = []
-            ref_start = "1990-01-01"
-            ref_end = "2020-12-31"
-            if use_ref_anomaly:
-                ref_anomaly_cols = st.multiselect("Colonnes climatiques", options=num_cols, key="ref_anomaly_cols_select")
-                col1, col2 = st.columns(2)
-                with col1:
-                    ref_start = st.text_input("Début référence (YYYY-MM-DD)", value="1990-01-01")
-                with col2:
-                    ref_end = st.text_input("Fin référence (YYYY-MM-DD)", value="2020-12-31")
-
-        # Extremes glissants
-        with st.container():
-            st.markdown("**⚡ Extremes glissants (min/max sur fenêtre)**")
-            use_extremes = st.checkbox("Ajouter min/max glissants", value=False)
-            extreme_cols = []
-            extreme_windows = [7, 30]
-            if use_extremes:
-                extreme_cols = st.multiselect("Colonnes à analyser", options=num_cols, key="extreme_cols_select")
-                extreme_windows_str = st.text_input("Fenêtres (jours, séparées par virgule)", value="7,30", key="extreme_windows")
-                extreme_windows = [int(x.strip()) for x in extreme_windows_str.split(",") if x.strip().isdigit()]
-
-    # Bouton d'application
-    st.markdown("---")
-    st.markdown("### 🚀 Lancer le prétraitement")
-    
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        if st.button("▶️ Appliquer le prétraitement", type="primary", use_container_width=True):
-            with st.spinner("Prétraitement en cours..."):
-                dcol = None if date_col == "(aucune)" else date_col
-                df_prep, info = clim_preprocessing.basic_climate_preprocessing(
-                    df,
-                    date_col=dcol,
-                    freq=freq,
-                    id_cols=id_cols,
-                    add_rolling=use_rolling,
-                    rolling_cols=rolling_cols,
-                    detect_anomalies=use_anomaly,
-                    anomaly_cols=anomaly_cols,
-                )
+    if st.button("Appliquer le prétraitement"):
+        with st.spinner("Prétraitement en cours..."):
+            dcol = None if date_col == "(aucune)" else date_col
+            df_prep, info = clim_preprocessing.basic_climate_preprocessing(
+                df,
+                date_col=dcol,
+                freq=freq,
+                id_cols=id_cols,
+                add_rolling=use_rolling,
+                rolling_cols=rolling_cols,
+                detect_anomalies=use_anomaly,
+                anomaly_cols=anomaly_cols,
+            )
             
             # Appliquer les features avancées si demandées
             if dcol:
@@ -1223,3 +1176,4 @@ def page_reporting() -> None:
 
 if __name__ == "__main__":  # pragma: no cover
     main()
+
