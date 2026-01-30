@@ -650,17 +650,26 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
         
         metrics_data = {}
         
-        if "metric_value" in model_info:
+        if "metric_value" in model_info and model_info["metric_value"] is not None:
             metrics_data['accuracy'] = [f"{model_info['metric_value']:.4f}"]
         
-        if "f1_score" in model_info:
+        if "f1_score" in model_info and model_info["f1_score"] is not None:
             metrics_data['f1_weighted'] = [f"{model_info['f1_score']:.4f}"]
         
-        if "precision" in model_info:
+        if "precision" in model_info and model_info["precision"] is not None:
             metrics_data['precision_weighted'] = [f"{model_info['precision']:.4f}"]
         
-        if "recall" in model_info:
+        if "recall" in model_info and model_info["recall"] is not None:
             metrics_data['recall_weighted'] = [f"{model_info['recall']:.4f}"]
+        
+        # Ajouter des métriques spécifiques à la régression si disponibles
+        if model_info.get("task_type") == "regression":
+            if "mse" in model_info and model_info["mse"] is not None:
+                metrics_data['mse'] = [f"{model_info['mse']:.4f}"]
+            if "rmse" in model_info and model_info["rmse"] is not None:
+                metrics_data['rmse'] = [f"{model_info['rmse']:.4f}"]
+            if "r2" in model_info and model_info["r2"] is not None:
+                metrics_data['r2_score'] = [f"{model_info['r2']:.4f}"]
         
         if metrics_data:
             metrics_df = pd.DataFrame(metrics_data)
