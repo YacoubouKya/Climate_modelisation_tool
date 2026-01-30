@@ -937,14 +937,15 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                             ).add_to(m1)
                     
                     # Ajouter une légende
+                    target_display = target_variable if target_variable else "Variable cible non détectée"
                     legend_html = f'''
                     <div style="position: fixed; 
-                                bottom: 50px; left: 50px; width: 180px; height: 110px; 
+                                bottom: 50px; left: 50px; width: 200px; height: 110px; 
                                 background-color: white; border:2px solid grey; z-index:9999; 
                                 font-size:14px; padding: 10px">
                     <p><b>Légende</b></p>
                     <p><i class="fa fa-circle" style="color:#1f77b4"></i> Points de données</p>
-                    <p><small>Colorés par: {target_variable if target_variable else 'Pas de variable cible'}</small></p>
+                    <p><small>Colorés par: {target_display}</small></p>
                     <p><small>Total: {len(df)} points</small></p>
                     </div>
                     '''
@@ -987,55 +988,38 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                         parts.append(map_html2)
                         parts.append("</div>")
                     
-                    # === CARTE 3: Points Colorés par Variable Climatique ===
-                    if climate_vars:
-                        parts.append("<h4>🌡️ Carte Thématique par Variable Climatique</h4>")
+                    # === CARTE 3: Carte Thématique par Variable Cible ===
+                    if target_variable and target_variable in df.columns:
+                        parts.append("<h4>🌡️ Carte Thématique par Variable Cible</h4>")
                         
-                        # Créer une section de sélection de variable
+                        # Créer une section d'information sur la variable cible
                         parts.append("<div class='info-box'>")
-                        parts.append("<h5>🎯 Sélection de Variable pour Coloration</h5>")
-                        parts.append("<p><strong>Variables disponibles :</strong></p>")
-                        parts.append("<div class='grid-3'>")
+                        parts.append("<h5>🎯 Variable Cible du Modèle</h5>")
+                        parts.append(f"<p><strong>Variable utilisée pour la coloration :</strong> <code>{target_variable}</code></p>")
                         
-                        # Afficher toutes les variables avec leurs statistiques
-                        for i, var in enumerate(climate_vars[:6]):  # Limiter à 6 variables pour l'affichage
-                            var_data = df[var].dropna()
-                            if len(var_data) > 0:
-                                # Vérifier si cette variable est celle sélectionnée
-                                is_selected = (var == color_var)
-                                parts.append(f"""
-                                    <div class='card' style='border: 2px solid #{"1f77b4" if is_selected else "#e0e0e0"};'>
-                                        <h6 style='color: #{"1f77b4" if is_selected else "#666"};'>{var} {'✓' if is_selected else ''}</h6>
-                                        <p><small>Moyenne: {var_data.mean():.2f}</small></p>
-                                        <p><small>Min: {var_data.min():.2f}</small></p>
-                                        <p><small>Max: {var_data.max():.2f}</small></p>
-                                        <p><small><em>{'Variable sélectionnée' if is_selected else 'Disponible'}</em></small></p>
-                                    </div>
-                                """)
-                        
+                        # Statistiques de la variable cible
+                        target_data = df[target_variable].dropna()
+                        if len(target_data) > 0:
+                            parts.append(f"""
+                            <div class='grid-2'>
+                                <div>
+                                    <p><strong>Plage de valeurs :</strong> {target_data.min():.2f} - {target_data.max():.2f}</p>
+                                    <p><strong>Moyenne :</strong> {target_data.mean():.2f}</p>
+                                    <p><strong>Médiane :</strong> {target_data.median():.2f}</p>
+                                </div>
+                                <div>
+                                    <p><strong>Écart-type :</strong> {target_data.std():.2f}</p>
+                                    <p><strong>Nombre de points :</strong> {len(target_data):,}</p>
+                                    <p><strong>Valeurs manquantes :</strong> {df[target_variable].isna().sum()}</p>
+                                </div>
+                            </div>
+                            """)
                         parts.append("</div>")
-                        parts.append("<p><em>Pour changer la variable affichée, modifiez le paramètre 'selected_climate_var' dans les options du rapport.</em></p>")
-                        parts.append("</div>")
-                        
-                        # Utiliser la variable sélectionnée (par défaut la première)
-                        # Récupérer la variable sélectionnée depuis les options du rapport
-                        selected_climate_var = None
-                        if "report_options" in session_state and "selected_climate_var" in session_state["report_options"]:
-                            selected_climate_var = session_state["report_options"]["selected_climate_var"]
-                        
-                        # Si une variable est sélectionnée et existe dans les données, l'utiliser
-                        if selected_climate_var and selected_climate_var in climate_vars:
-                            selected_var_index = climate_vars.index(selected_climate_var)
-                            color_var = selected_climate_var
-                        else:
-                            # Sinon, utiliser la première variable par défaut
-                            selected_var_index = 0
-                            color_var = climate_vars[0]
                         
                         m3 = folium.Map(location=[center_lat, center_lon], zoom_start=10)
                         
-                        # Créer une colormap
-                        var_data = df[color_var].dropna()
+                        # Créer une colormap pour la variable cible
+                        var_data = df[target_variable].dropna()
                         if len(var_data) > 0:
                             min_val = var_data.min()
                             max_val = var_data.max()
@@ -1043,23 +1027,23 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                             # Créer une colormap avec plus de couleurs pour meilleure distinction
                             colormap = cm.LinearColormap(['#2E86AB', '#A23B72', '#F18F01', '#C73E1D'], 
                                                          vmin=min_val, vmax=max_val)
-                            colormap.caption = f'{color_var} ({min_val:.2f} - {max_val:.2f})'
+                            colormap.caption = f'{target_variable} ({min_val:.2f} - {max_val:.2f})'
                             colormap.position = 'bottomright'
                             
                             # Ajouter les points colorés avec taille variable selon la valeur
-                            color_data = df[[lat_col, lon_col, color_var]].dropna().head(300)  # Plus de points
+                            color_data = df[[lat_col, lon_col, target_variable]].dropna().head(300)  # Plus de points
                             for idx, row in color_data.iterrows():
                                 # Normaliser la valeur pour la taille du point
-                                normalized_val = (row[color_var] - min_val) / (max_val - min_val) if max_val != min_val else 0.5
+                                normalized_val = (row[target_variable] - min_val) / (max_val - min_val) if max_val != min_val else 0.5
                                 radius = 3 + normalized_val * 7  # Taille entre 3 et 10
                                 
-                                color = colormap(row[color_var])
+                                color = colormap(row[target_variable])
                                 popup_text = f"""
                                 <div style='width: 200px;'>
                                     <h5>Point #{idx}</h5>
                                     <p><strong>Latitude:</strong> {row[lat_col]:.4f}</p>
                                     <p><strong>Longitude:</strong> {row[lon_col]:.4f}</p>
-                                    <p><strong>{color_var}:</strong> <span style='color: {color}; font-weight: bold;'>{row[color_var]:.2f}</span></p>
+                                    <p><strong>{target_variable}:</strong> <span style='color: {color}; font-weight: bold;'>{row[target_variable]:.2f}</span></p>
                                     <p><small>Percentile: {(normalized_val * 100):.1f}%</small></p>
                                 </div>
                                 """
@@ -1067,7 +1051,7 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                                     location=[row[lat_col], row[lon_col]],
                                     radius=radius,
                                     popup=folium.Popup(popup_text, max_width=250),
-                                    tooltip=f"{color_var}: {row[color_var]:.2f}",
+                                    tooltip=f"{target_variable}: {row[target_variable]:.2f}",
                                     color=color,
                                     fill=True,
                                     fillColor=color,
@@ -1092,7 +1076,7 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                             # Informations détaillées sur la variable utilisée
                             parts.append(f"""
                             <div class='info-box'>
-                                <h5>📊 Variable Cible : {target_variable if target_variable else 'Non spécifiée'}</h5>
+                                <h5>📊 Variable Cible : {target_variable}</h5>
                                 <div class='grid-2'>
                                     <div>
                                         <p><strong>Plage de valeurs :</strong> {min_val:.2f} - {max_val:.2f}</p>
@@ -1102,34 +1086,30 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                                     <div>
                                         <p><strong>Écart-type :</strong> {var_data.std():.2f}</p>
                                         <p><strong>Nombre de points :</strong> {len(var_data):,}</p>
-                                        <p><strong>Valeurs manquantes :</strong> {df[target_variable].isna().sum() if target_variable else 0}</p>
+                                        <p><strong>Valeurs manquantes :</strong> {df[target_variable].isna().sum()}</p>
                                     </div>
                                 </div>
                                 <p><em>💡 Les points sont colorés et dimensionnés selon la valeur de la variable cible du modèle. Utilisez les contrôles en haut à droite pour changer le fond de carte.</em></p>
                             </div>
                             """)
-                            
-                            # Ajouter une section pour les autres variables
-                            if len(climate_vars) > 1:
-                                parts.append("<div class='info-box'>")
-                                parts.append("<h5>🔄 Autres Variables Disponibles</h5>")
-                                parts.append("<p>Pour générer des cartes avec d'autres variables, vous pouvez :</p>")
-                                parts.append("<ul>")
-                                parts.append("<li>Modifier l'ordre des colonnes dans vos données</li>")
-                                parts.append("<li>Utiliser l'interface de personnalisation du rapport (bientôt disponible)</li>")
-                                parts.append("<li>Créer plusieurs rapports avec différentes configurations</li>")
-                                parts.append("</ul>")
-                                parts.append("</div>")
                         
-                        # Si pas assez de données pour la variable sélectionnée
+                        # Si pas assez de données pour la variable cible
                         else:
                             parts.append(f"""
                                 <div class='warning-box'>
                                     <h5>⚠️ Données Insuffisantes</h5>
-                                    <p>La variable cible '{target_variable if target_variable else 'spécifiée'}' ne contient pas assez de données valides pour créer une carte thématique.</p>
+                                    <p>La variable cible '{target_variable}' ne contient pas assez de données valides pour créer une carte thématique.</p>
                                     <p>Points disponibles : {len(var_data)} / {len(df)}</p>
                                 </div>
                             """)
+                    else:
+                        parts.append("""
+                            <div class='warning-box'>
+                                <h5>🎯 Aucune Variable Cible Détectée</h5>
+                                <p>Pour créer une carte thématique, le système doit détecter la variable cible du modèle.</p>
+                                <p>Vérifiez que votre modèle a été correctement entraîné avec une variable cible.</p>
+                            </div>
+                        """)
                     
                     # === CARTE 4: Clustering avec Variable Cible ===
                     if len(valid_data) > 50:
