@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, GradientBoostingClassifier, GradientBoostingRegressor
 from sklearn.linear_model import LogisticRegression, LinearRegression
-from sklearn.metrics import mean_squared_error, accuracy_score, f1_score
+from sklearn.metrics import mean_squared_error, accuracy_score, f1_score, precision_score, recall_score, mean_absolute_error, r2_score
 from sklearn.model_selection import train_test_split, TimeSeriesSplit, cross_val_score
 from sklearn.pipeline import Pipeline
 
@@ -130,13 +130,30 @@ def run_climate_modeling(
     if task_type == "classification":
         metric_value = accuracy_score(y_test, y_pred)
         metric_name = "accuracy"
-        # Ajouter F1-score pour mieux évaluer le déséquilibre
-        f1 = f1_score(y_test, y_pred, average="weighted")
+        # Calculer toutes les métriques de classification
+        f1 = f1_score(y_test, y_pred, average="weighted", zero_division=0)
+        precision = precision_score(y_test, y_pred, average="weighted", zero_division=0)
+        recall = recall_score(y_test, y_pred, average="weighted", zero_division=0)
+        
+        # Métriques de régression (initialisées à None)
+        mse = None
+        rmse = None
+        mae = None
+        r2 = None
     else:
-        rmse = float(np.sqrt(mean_squared_error(y_test, y_pred)))
+        # Calculer toutes les métriques de régression
+        mse = mean_squared_error(y_test, y_pred)
+        rmse = float(np.sqrt(mse))
+        mae = mean_absolute_error(y_test, y_pred)
+        r2 = r2_score(y_test, y_pred)
+        
         metric_value = rmse
         metric_name = "rmse"
+        
+        # Métriques de classification (initialisées à None)
         f1 = None
+        precision = None
+        recall = None
     
     # Validation temporelle si demandée et date disponible
     cv_scores = None
@@ -173,7 +190,15 @@ def run_climate_modeling(
         "metric_value": metric_value,
         "y_pred": y_pred,
         "y_proba": y_proba,
+        # Métriques de classification
         "f1_score": f1,
+        "precision": precision,
+        "recall": recall,
+        # Métriques de régression
+        "mse": mse,
+        "rmse": rmse,
+        "mae": mae,
+        "r2": r2,
         "cv_scores": cv_scores,
         "feature_importance": feature_importance,
         "feature_names": feature_names,

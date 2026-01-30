@@ -617,13 +617,6 @@ def page_preprocessing() -> None:
                 st.error(f"❌ Erreur lors du prétraitement : {str(e)}")
                 st.exception(e)
 
-    # Afficher les données prétraitées existantes si disponibles
-    if "clim_data_prep" in st.session_state and st.session_state["clim_data_prep"] is not None:
-        st.markdown("---")
-        st.subheader("💾 Données prétraitées en mémoire")
-        df_existing = st.session_state["clim_data_prep"]
-        st.dataframe(df_existing.head(), use_container_width=True)
-
 
 def page_modeling() -> None:
     st.header(" Modélisation du Risque Climatique")
@@ -708,7 +701,15 @@ def page_modeling() -> None:
                         "model_name": result["model_name"],
                         "metric_name": result["metric_name"],
                         "metric_value": result["test_score"],
-                        "f1_score": result["f1_score"],
+                        # Métriques de classification
+                        "f1_score": result.get("f1_score"),
+                        "precision": result.get("precision"),
+                        "recall": result.get("recall"),
+                        # Métriques de régression
+                        "mse": result.get("mse"),
+                        "rmse": result.get("rmse"),
+                        "mae": result.get("mae"),
+                        "r2": result.get("r2"),
                         "cv_scores": result["cv_scores"],
                         "y_test": result.get("y_test"),
                         "y_pred": result.get("y_pred"),
@@ -769,7 +770,15 @@ def page_modeling() -> None:
                             "model_name": best_result["model_name"],
                             "metric_name": best_result["metric_name"],
                             "metric_value": best_result["test_score"],
-                            "f1_score": best_result["f1_score"],
+                            # Métriques de classification
+                            "f1_score": best_result.get("f1_score"),
+                            "precision": best_result.get("precision"),
+                            "recall": best_result.get("recall"),
+                            # Métriques de régression
+                            "mse": best_result.get("mse"),
+                            "rmse": best_result.get("rmse"),
+                            "mae": best_result.get("mae"),
+                            "r2": best_result.get("r2"),
                             "cv_scores": best_result["cv_scores"],
                             "y_test": best_result.get("y_test"),
                             "y_pred": best_result.get("y_pred"),
@@ -901,7 +910,15 @@ def page_modeling() -> None:
                                 "model_name": f"{tuned_result['model_name']} (Affiné)",
                                 "metric_name": tuned_result["metric_name"],
                                 "metric_value": tuned_result["test_score"],
-                                "f1_score": tuned_result["f1_score"],
+                                # Métriques de classification
+                                "f1_score": tuned_result.get("f1_score"),
+                                "precision": tuned_result.get("precision"),
+                                "recall": tuned_result.get("recall"),
+                                # Métriques de régression
+                                "mse": tuned_result.get("mse"),
+                                "rmse": tuned_result.get("rmse"),
+                                "mae": tuned_result.get("mae"),
+                                "r2": tuned_result.get("r2"),
                                 "cv_scores": tuned_result["cv_scores"],
                             }
                             

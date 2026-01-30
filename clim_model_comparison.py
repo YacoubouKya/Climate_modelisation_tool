@@ -24,12 +24,11 @@ from sklearn.ensemble import (
     RandomForestRegressor,
 )
 from sklearn.linear_model import Lasso, LinearRegression, LogisticRegression, Ridge
-from sklearn.metrics import accuracy_score, f1_score, mean_squared_error, r2_score
+from sklearn.metrics import accuracy_score, f1_score, mean_squared_error, r2_score, precision_score, recall_score, mean_absolute_error
 from sklearn.model_selection import cross_val_score, train_test_split
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from sklearn.pipeline import Pipeline
-from sklearn.compose import ColumnTransformer
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 
 # Importer les utilitaires communs
@@ -136,14 +135,28 @@ def train_and_evaluate_model(
         if task == "classification":
             test_score = accuracy_score(y_test, y_pred)
             train_score = accuracy_score(y_train, y_train_pred)
+            # Calculer toutes les métriques de classification
             f1 = f1_score(y_test, y_pred, average="weighted", zero_division=0)
+            precision = precision_score(y_test, y_pred, average="weighted", zero_division=0)
+            recall = recall_score(y_test, y_pred, average="weighted", zero_division=0)
+            # Métriques de régression (initialisées à None)
+            mse = None
             rmse = None
+            mae = None
+            r2 = None
             metric_name = "Accuracy"
         else:
-            test_score = r2_score(y_test, y_pred)
+            # Calculer toutes les métriques de régression
+            mse = mean_squared_error(y_test, y_pred)
+            rmse = np.sqrt(mse)
+            mae = mean_absolute_error(y_test, y_pred)
+            r2 = r2_score(y_test, y_pred)
+            test_score = r2
             train_score = r2_score(y_train, y_train_pred)
+            # Métriques de classification (initialisées à None)
             f1 = None
-            rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+            precision = None
+            recall = None
             metric_name = "R²"
 
         # Cross-validation
@@ -162,8 +175,15 @@ def train_and_evaluate_model(
             "pipeline": pipe,
             "test_score": test_score,
             "train_score": train_score,
+            # Métriques de classification
             "f1_score": f1,
+            "precision": precision,
+            "recall": recall,
+            # Métriques de régression
+            "mse": mse,
             "rmse": rmse,
+            "mae": mae,
+            "r2": r2,
             "cv_scores": cv_scores,
             "training_time": time.time() - start_time,
             "metric_name": metric_name,
@@ -180,8 +200,15 @@ def train_and_evaluate_model(
             "pipeline": None,
             "test_score": None,
             "train_score": None,
+            # Métriques de classification
             "f1_score": None,
+            "precision": None,
+            "recall": None,
+            # Métriques de régression
+            "mse": None,
             "rmse": None,
+            "mae": None,
+            "r2": None,
             "cv_scores": None,
             "training_time": time.time() - start_time,
             "metric_name": None,
@@ -341,7 +368,7 @@ def compare_models(
         results.append(result)
         
         if result["success"]:
-            time_text.text(f" {model_name} : {model_time:.1f}s")
+            time_text.text(f"⏱️ {model_name} : {model_time:.1f}s")
         else:
             time_text.text(f"❌ {model_name} : Échec")
         
@@ -395,12 +422,12 @@ def display_comparison_results(results: List[Dict[str, Any]], task: str) -> Dict
     
     # Afficher le meilleur modèle en haut
     st.success(
-        f" **Meilleur modèle** : {best_result['model_name']} "
+        f"🏆 **Meilleur modèle** : {best_result['model_name']} "
         f"({best_result['metric_name']} = {best_result['test_score']:.4f})"
     )
 
     # Afficher le tableau
-    st.subheader(" Tableau de comparaison")
+    st.subheader("📊 Tableau de comparaison")
     st.dataframe(results_df.style.format({
         "Score Test": "{:.4f}",
         "Score Train": "{:.4f}",
@@ -413,7 +440,7 @@ def display_comparison_results(results: List[Dict[str, Any]], task: str) -> Dict
 
     # Graphiques de comparaison
     st.markdown("---")
-    st.subheader(" Visualisations")
+    st.subheader("📈 Visualisations")
     
     col1, col2 = st.columns(2)
     
@@ -445,7 +472,7 @@ def display_comparison_results(results: List[Dict[str, Any]], task: str) -> Dict
     metric_cols = [col for col in results_df.columns if col not in ["Modèle", "Temps (s)"]]
     if len(metric_cols) >= 2:
         st.markdown("---")
-        st.subheader(" Heatmap des métriques")
+        st.subheader("🔥 Heatmap des métriques")
         
         fig3, ax3 = plt.subplots(figsize=(10, len(results_df) * 0.5 + 2))
         heatmap_data = results_df[["Modèle"] + metric_cols].set_index("Modèle")
@@ -473,4 +500,3 @@ def display_comparison_results(results: List[Dict[str, Any]], task: str) -> Dict
                 st.error(f"**{r['model_name']}** : {r['error']}")
 
     return best_result
-

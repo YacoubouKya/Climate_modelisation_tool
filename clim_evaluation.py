@@ -76,22 +76,123 @@ def show_evaluation(info: dict) -> None:
     y_test = info.get("y_test")
     y_pred = info.get("y_pred")
 
-    st.subheader(" Résultats globaux")
+    st.subheader("📊 Résultats globaux")
     
-    # Afficher les métriques principales
-    col1, col2, col3 = st.columns(3)
+    # Afficher les 4 métriques principales selon le type de tâche
+    if task_type == "classification":
+        col1, col2, col3, col4 = st.columns(4)
+        
+        # Accuracy
+        with col1:
+            if metric_value is not None:
+                st.markdown(f"""
+                <div style="text-align: center; padding: 10px; background-color: #f0f2f6; border-radius: 10px;">
+                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">ACCURACY</div>
+                    <div style="font-size: 20px; font-weight: bold; color: #1f77b4;">{metric_value:.4f}</div>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # F1-Score
+        with col2:
+            f1_score = info.get("f1_score")
+            if f1_score is not None:
+                st.markdown(f"""
+                <div style="text-align: center; padding: 10px; background-color: #f0f2f6; border-radius: 10px;">
+                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">F1-SCORE</div>
+                    <div style="font-size: 20px; font-weight: bold; color: #ff7f0e;">{f1_score:.4f}</div>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # Precision
+        with col3:
+            precision = info.get("precision")
+            if precision is not None:
+                st.markdown(f"""
+                <div style="text-align: center; padding: 10px; background-color: #f0f2f6; border-radius: 10px;">
+                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">PRECISION</div>
+                    <div style="font-size: 20px; font-weight: bold; color: #2ca02c;">{precision:.4f}</div>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # Recall
+        with col4:
+            recall = info.get("recall")
+            if recall is not None:
+                st.markdown(f"""
+                <div style="text-align: center; padding: 10px; background-color: #f0f2f6; border-radius: 10px;">
+                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">RECALL</div>
+                    <div style="font-size: 20px; font-weight: bold; color: #d62728;">{recall:.4f}</div>
+                </div>
+                """, unsafe_allow_html=True)
+    
+    else:  # Régression
+        col1, col2, col3, col4 = st.columns(4)
+        
+        # RMSE (métrique principale)
+        with col1:
+            if metric_value is not None:
+                st.markdown(f"""
+                <div style="text-align: center; padding: 10px; background-color: #f0f2f6; border-radius: 10px;">
+                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">RMSE</div>
+                    <div style="font-size: 20px; font-weight: bold; color: #1f77b4;">{metric_value:.4f}</div>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # MSE
+        with col2:
+            mse = info.get("mse")
+            if mse is not None:
+                st.markdown(f"""
+                <div style="text-align: center; padding: 10px; background-color: #f0f2f6; border-radius: 10px;">
+                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">MSE</div>
+                    <div style="font-size: 20px; font-weight: bold; color: #ff7f0e;">{mse:.4f}</div>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # MAE
+        with col3:
+            mae = info.get("mae")
+            if mae is not None:
+                st.markdown(f"""
+                <div style="text-align: center; padding: 10px; background-color: #f0f2f6; border-radius: 10px;">
+                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">MAE</div>
+                    <div style="font-size: 20px; font-weight: bold; color: #2ca02c;">{mae:.4f}</div>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # R²
+        with col4:
+            r2 = info.get("r2")
+            if r2 is not None:
+                st.markdown(f"""
+                <div style="text-align: center; padding: 10px; background-color: #f0f2f6; border-radius: 10px;">
+                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">R²</div>
+                    <div style="font-size: 20px; font-weight: bold; color: #d62728;">{r2:.4f}</div>
+                </div>
+                """, unsafe_allow_html=True)
+    
+    # Afficher le nom du modèle avec une taille de police appropriée
+    st.markdown("---")
+    model_name = info.get("model_name", "N/A")
+    cv_scores = info.get("cv_scores")
+    
+    col1, col2 = st.columns([2, 1])
     with col1:
-        if metric_value is not None:
-            st.metric(label=metric_name.upper(), value=f"{metric_value:.4f}" if isinstance(metric_value, (int, float)) else metric_value)
+        st.markdown(f"""
+        <div style="padding: 10px; background-color: #e8f4f8; border-radius: 10px; border-left: 4px solid #1f77b4;">
+            <div style="font-size: 14px; color: #666; margin-bottom: 5px;">MODÈLE UTILISÉ</div>
+            <div style="font-size: 16px; font-weight: bold; color: #333;">{model_name}</div>
+        </div>
+        """, unsafe_allow_html=True)
     
     with col2:
-        model_name = info.get("model_name", "N/A")
-        st.metric("Modèle", model_name)
-    
-    with col3:
-        cv_scores = info.get("cv_scores")
         if cv_scores is not None and len(cv_scores) > 0:
-            st.metric("CV Score", f"{cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
+            st.markdown(f"""
+            <div style="padding: 10px; background-color: #f0f8e8; border-radius: 10px; border-left: 4px solid #2ca02c;">
+                <div style="font-size: 12px; color: #666; margin-bottom: 5px;">CV SCORE</div>
+                <div style="font-size: 14px; font-weight: bold; color: #333;">{cv_scores.mean():.4f} ± {cv_scores.std():.4f}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
     if y_test is None or y_pred is None:
         return
@@ -100,7 +201,7 @@ def show_evaluation(info: dict) -> None:
     y_pred = pd.Series(y_pred, index=y_test.index)
 
     if task_type == "classification":
-        st.subheader(" Matrice de confusion")
+        st.subheader("🧩 Matrice de confusion")
         labels = sorted(y_test.unique())
         cm = confusion_matrix(y_test, y_pred, labels=labels)
 
@@ -111,7 +212,7 @@ def show_evaluation(info: dict) -> None:
         st.pyplot(fig)
         
         # Métriques détaillées
-        st.subheader(" Métriques détaillées")
+        st.subheader("📊 Métriques détaillées")
         try:
             precision = precision_score(y_test, y_pred, average="weighted", zero_division=0)
             recall = recall_score(y_test, y_pred, average="weighted", zero_division=0)
@@ -132,7 +233,7 @@ def show_evaluation(info: dict) -> None:
         if len(labels) == 2 and "y_proba" in info:
             y_proba = info["y_proba"]
             if y_proba is not None and len(y_proba.shape) == 2:
-                st.subheader(" Courbes PR et ROC")
+                st.subheader("📈 Courbes PR et ROC")
                 
                 # Courbe Precision-Recall
                 precision_curve, recall_curve, _ = precision_recall_curve(y_test, y_proba[:, 1])
@@ -169,7 +270,7 @@ def show_evaluation(info: dict) -> None:
             if isinstance(X_test, pd.DataFrame):
                 cat_cols = X_test.select_dtypes(include=["object", "category"]).columns.tolist()
                 if cat_cols:
-                    st.subheader(" Analyse par segment")
+                    st.subheader("🔍 Analyse par segment")
                     segment_col = st.selectbox("Colonne de segmentation", options=cat_cols)
                     
                     if segment_col:
@@ -197,7 +298,7 @@ def show_evaluation(info: dict) -> None:
                         st.pyplot(fig)
 
     else:
-        st.subheader(" Prédictions vs valeurs réelles")
+        st.subheader("📈 Prédictions vs valeurs réelles")
         fig, ax = plt.subplots(figsize=(6, 5))
         ax.scatter(y_test, y_pred, alpha=0.6)
         min_val = float(min(y_test.min(), y_pred.min()))
@@ -207,7 +308,7 @@ def show_evaluation(info: dict) -> None:
         ax.set_ylabel("Prédictions")
         st.pyplot(fig)
 
-        st.subheader(" Résidus")
+        st.subheader("📉 Résidus")
         residuals = y_test - y_pred
         fig2, ax2 = plt.subplots(figsize=(6, 4))
         sns.histplot(residuals, kde=True, ax=ax2)
@@ -215,7 +316,7 @@ def show_evaluation(info: dict) -> None:
         st.pyplot(fig2)
         
         # Métriques orientées risque pour régression
-        st.subheader(" Métriques orientées risque")
+        st.subheader("⚠️ Métriques orientées risque")
         mae = np.abs(residuals).mean()
         rmse = np.sqrt((residuals ** 2).mean())
         mape = (np.abs(residuals / y_test) * 100).mean() if (y_test != 0).all() else np.nan
@@ -260,4 +361,3 @@ def show_evaluation(info: dict) -> None:
                         ax.set_title(f"Erreur par {segment_col}")
                         plt.xticks(rotation=45, ha="right")
                         st.pyplot(fig)
-
