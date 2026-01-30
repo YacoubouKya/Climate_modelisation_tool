@@ -910,8 +910,47 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                     if climate_vars:
                         parts.append("<h4>🌡️ Carte Thématique par Variable Climatique</h4>")
                         
-                        # Utiliser la première variable climatique disponible
-                        color_var = climate_vars[0]
+                        # Créer une section de sélection de variable
+                        parts.append("<div class='info-box'>")
+                        parts.append("<h5>🎯 Sélection de Variable pour Coloration</h5>")
+                        parts.append("<p><strong>Variables disponibles :</strong></p>")
+                        parts.append("<div class='grid-3'>")
+                        
+                        # Afficher toutes les variables avec leurs statistiques
+                        for i, var in enumerate(climate_vars[:6]):  # Limiter à 6 variables pour l'affichage
+                            var_data = df[var].dropna()
+                            if len(var_data) > 0:
+                                # Vérifier si cette variable est celle sélectionnée
+                                is_selected = (var == color_var)
+                                parts.append(f"""
+                                    <div class='card' style='border: 2px solid #{"1f77b4" if is_selected else "#e0e0e0"};'>
+                                        <h6 style='color: #{"1f77b4" if is_selected else "#666"};'>{var} {'✓' if is_selected else ''}</h6>
+                                        <p><small>Moyenne: {var_data.mean():.2f}</small></p>
+                                        <p><small>Min: {var_data.min():.2f}</small></p>
+                                        <p><small>Max: {var_data.max():.2f}</small></p>
+                                        <p><small><em>{'Variable sélectionnée' if is_selected else 'Disponible'}</em></small></p>
+                                    </div>
+                                """)
+                        
+                        parts.append("</div>")
+                        parts.append("<p><em>Pour changer la variable affichée, modifiez le paramètre 'selected_climate_var' dans les options du rapport.</em></p>")
+                        parts.append("</div>")
+                        
+                        # Utiliser la variable sélectionnée (par défaut la première)
+                        # Récupérer la variable sélectionnée depuis les options du rapport
+                        selected_climate_var = None
+                        if "report_options" in context and "selected_climate_var" in context["report_options"]:
+                            selected_climate_var = context["report_options"]["selected_climate_var"]
+                        
+                        # Si une variable est sélectionnée et existe dans les données, l'utiliser
+                        if selected_climate_var and selected_climate_var in climate_vars:
+                            selected_var_index = climate_vars.index(selected_climate_var)
+                            color_var = selected_climate_var
+                        else:
+                            # Sinon, utiliser la première variable par défaut
+                            selected_var_index = 0
+                            color_var = climate_vars[0]
+                        
                         m3 = folium.Map(location=[center_lat, center_lon], zoom_start=10)
                         
                         # Créer une colormap
@@ -920,49 +959,95 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                             min_val = var_data.min()
                             max_val = var_data.max()
                             
-                            # Créer une colormap
-                            colormap = cm.LinearColormap(['blue', 'green', 'yellow', 'red'], 
+                            # Créer une colormap avec plus de couleurs pour meilleure distinction
+                            colormap = cm.LinearColormap(['#2E86AB', '#A23B72', '#F18F01', '#C73E1D'], 
                                                          vmin=min_val, vmax=max_val)
                             colormap.caption = f'{color_var} ({min_val:.2f} - {max_val:.2f})'
+                            colormap.position = 'bottomright'
                             
-                            # Ajouter les points colorés
-                            color_data = df[[lat_col, lon_col, color_var]].dropna().head(200)
+                            # Ajouter les points colorés avec taille variable selon la valeur
+                            color_data = df[[lat_col, lon_col, color_var]].dropna().head(300)  # Plus de points
                             for idx, row in color_data.iterrows():
+                                # Normaliser la valeur pour la taille du point
+                                normalized_val = (row[color_var] - min_val) / (max_val - min_val) if max_val != min_val else 0.5
+                                radius = 3 + normalized_val * 7  # Taille entre 3 et 10
+                                
                                 color = colormap(row[color_var])
                                 popup_text = f"""
-                                <b>Point #{idx}</b><br>
-                                <b>Latitude:</b> {row[lat_col]:.4f}<br>
-                                <b>Longitude:</b> {row[lon_col]:.4f}<br>
-                                <b>{color_var}:</b> {row[color_var]:.2f}
+                                <div style='width: 200px;'>
+                                    <h5>Point #{idx}</h5>
+                                    <p><strong>Latitude:</strong> {row[lat_col]:.4f}</p>
+                                    <p><strong>Longitude:</strong> {row[lon_col]:.4f}</p>
+                                    <p><strong>{color_var}:</strong> <span style='color: {color}; font-weight: bold;'>{row[color_var]:.2f}</span></p>
+                                    <p><small>Percentile: {(normalized_val * 100):.1f}%</small></p>
+                                </div>
                                 """
                                 folium.CircleMarker(
                                     location=[row[lat_col], row[lon_col]],
-                                    radius=5,
+                                    radius=radius,
                                     popup=folium.Popup(popup_text, max_width=250),
                                     tooltip=f"{color_var}: {row[color_var]:.2f}",
                                     color=color,
                                     fill=True,
                                     fillColor=color,
-                                    fillOpacity=0.8
+                                    fillOpacity=0.8,
+                                    weight=2
                                 ).add_to(m3)
                             
                             # Ajouter la colormap à la carte
                             m3.add_child(colormap)
+                            
+                            # Ajouter des contrôles de couches
+                            folium.TileLayer('OpenStreetMap').add_to(m3)
+                            folium.TileLayer('Stamen Terrain').add_to(m3)
+                            folium.TileLayer('CartoDB positron').add_to(m3)
+                            folium.LayerControl().add_to(m3)
                             
                             map_html3 = m3._repr_html_()
                             parts.append("<div class='figure-container'>")
                             parts.append(map_html3)
                             parts.append("</div>")
                             
-                            # Informations sur la variable utilisée
+                            # Informations détaillées sur la variable utilisée
                             parts.append(f"""
                             <div class='info-box'>
-                                <h5>📊 Variable Utilisée : {color_var}</h5>
-                                <p><strong>Plage de valeurs :</strong> {min_val:.2f} - {max_val:.2f}</p>
-                                <p><strong>Moyenne :</strong> {var_data.mean():.2f}</p>
-                                <p><strong>Écart-type :</strong> {var_data.std():.2f}</p>
-                                <p><em>Les points sont colorés selon la valeur de cette variable</em></p>
+                                <h5>📊 Variable Sélectionnée : {color_var}</h5>
+                                <div class='grid-2'>
+                                    <div>
+                                        <p><strong>Plage de valeurs :</strong> {min_val:.2f} - {max_val:.2f}</p>
+                                        <p><strong>Moyenne :</strong> {var_data.mean():.2f}</p>
+                                        <p><strong>Médiane :</strong> {var_data.median():.2f}</p>
+                                    </div>
+                                    <div>
+                                        <p><strong>Écart-type :</strong> {var_data.std():.2f}</p>
+                                        <p><strong>Nombre de points :</strong> {len(var_data):,}</p>
+                                        <p><strong>Valeurs manquantes :</strong> {df[color_var].isna().sum()}</p>
+                                    </div>
+                                </div>
+                                <p><em>💡 Les points sont colorés et dimensionnés selon la valeur de cette variable. Utilisez les contrôles en haut à droite pour changer le fond de carte.</em></p>
                             </div>
+                            """)
+                            
+                            # Ajouter une section pour les autres variables
+                            if len(climate_vars) > 1:
+                                parts.append("<div class='info-box'>")
+                                parts.append("<h5>🔄 Autres Variables Disponibles</h5>")
+                                parts.append("<p>Pour générer des cartes avec d'autres variables, vous pouvez :</p>")
+                                parts.append("<ul>")
+                                parts.append("<li>Modifier l'ordre des colonnes dans vos données</li>")
+                                parts.append("<li>Utiliser l'interface de personnalisation du rapport (bientôt disponible)</li>")
+                                parts.append("<li>Créer plusieurs rapports avec différentes configurations</li>")
+                                parts.append("</ul>")
+                                parts.append("</div>")
+                        
+                        # Si pas assez de données pour la variable sélectionnée
+                        else:
+                            parts.append(f"""
+                                <div class='warning-box'>
+                                    <h5>⚠️ Données Insuffisantes</h5>
+                                    <p>La variable '{color_var}' ne contient pas assez de données valides pour créer une carte thématique.</p>
+                                    <p>Points disponibles : {len(var_data)} / {len(df)}</p>
+                                </div>
                             """)
                     
                     # === CARTE 4: Clustering ===
@@ -1164,6 +1249,50 @@ def show_climate_reporting_summary(session_state: dict) -> None:
         report_title = st.text_input("Titre du rapport", "Rapport d'Analyse Climatique")
         include_code = st.checkbox("Inclure le code source", value=False)
         
+        # Option de sélection de variable pour la cartographie
+        st.markdown("##### 🗺️ Cartographie")
+        
+        # Détecter les variables climatiques disponibles
+        df = session_state.get("clim_data")
+        climate_vars_for_selection = []
+        
+        if isinstance(df, pd.DataFrame):
+            # Identifier les colonnes géospatiales
+            geo_cols = []
+            for col in df.columns:
+                col_lower = col.lower()
+                if any(keyword in col_lower for keyword in ['lat', 'latitude', 'lon', 'longitude', 'x', 'y']):
+                    geo_cols.append(col)
+            
+            # Identifier les variables climatiques
+            numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+            climate_vars_for_selection = [col for col in numeric_cols 
+                                         if col not in geo_cols and 
+                                         not any(geo in col.lower() for geo in ['lat', 'lon', 'x', 'y'])]
+        
+        if climate_vars_for_selection:
+            selected_climate_var = st.selectbox(
+                "Variable pour la carte thématique",
+                options=climate_vars_for_selection,
+                index=0,
+                help="Sélectionnez la variable climatique à utiliser pour colorer les points sur la carte thématique"
+            )
+            
+            # Afficher les statistiques de la variable sélectionnée
+            if selected_climate_var in df.columns:
+                var_data = df[selected_climate_var].dropna()
+                if len(var_data) > 0:
+                    st.markdown(f"""
+                    <div style='background-color: #f0f2f6; padding: 10px; border-radius: 5px; font-size: 12px;'>
+                        <strong>📊 {selected_climate_var}</strong><br>
+                        Min: {var_data.min():.2f} | Max: {var_data.max():.2f}<br>
+                        Moyenne: {var_data.mean():.2f} | Médiane: {var_data.median():.2f}
+                    </div>
+                    """, unsafe_allow_html=True)
+        else:
+            st.info("🔍 Aucune variable climatique détectée pour la cartographie")
+            selected_climate_var = None
+        
         # Informations sur le rapport
         st.markdown("##### 📊 Informations")
         info_text = f"""
@@ -1192,7 +1321,8 @@ def show_climate_reporting_summary(session_state: dict) -> None:
                         "report_options": {
                             "sections": selected_sections,
                             "title": report_title,
-                            "include_code": include_code
+                            "include_code": include_code,
+                            "selected_climate_var": selected_climate_var  # Ajouter la variable sélectionnée
                         }
                     }
                     
