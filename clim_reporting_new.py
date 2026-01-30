@@ -465,7 +465,7 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
     report_title = report_options.get("title", "Rapport d'Analyse de Risque Climatique")
     include_code = report_options.get("include_code", False)
     
-    if (df is None or (isinstance(df, pd.DataFrame) and df.empty)) and not data_sources:
+    if (df is None or (isinstance(df, pd.DataFrame) and df.empty)) and not bool(data_sources):
         return None
     
     # Génération du nom du fichier
@@ -550,7 +550,7 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                 parts.append(f"<div class='warning-box'>Erreur lors de la génération de la matrice de corrélation: {str(e)}</div>")
     
     # Section 2: Prétraitement
-    if (prep_info or isinstance(df_prep, pd.DataFrame)) and (not selected_sections or "preprocessing" in selected_sections):
+    if (bool(prep_info) or (isinstance(df_prep, pd.DataFrame) and not df_prep.empty)) and (not selected_sections or "preprocessing" in selected_sections):
         parts.append("<h2>2. Prétraitement des données</h2>")
         
         if prep_info:
