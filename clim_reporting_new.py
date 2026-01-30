@@ -450,7 +450,7 @@ def _create_evaluation_plots(model_info: Dict[str, Any]) -> plt.Figure:
 def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
     """
     Génère un rapport HTML pour l'analyse de risque climatique
-    avec le design exact du rapport exemple.
+    avec le design exact du rapport exemple et options de personnalisation.
     """
     # Récupération des données
     df = session_state.get("clim_data")
@@ -458,6 +458,12 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
     model_info = session_state.get("clim_model_info")
     prep_info = session_state.get("clim_prep_info", {})
     data_sources = session_state.get("data_sources", {})
+    
+    # Récupération des options de personnalisation
+    report_options = session_state.get("report_options", {})
+    selected_sections = report_options.get("sections", [])
+    report_title = report_options.get("title", "Rapport d'Analyse de Risque Climatique")
+    include_code = report_options.get("include_code", False)
     
     if not df and not data_sources:
         return None
@@ -473,15 +479,14 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
     parts.extend([
         "<html><head>",
         "<meta charset='utf-8'>",
-        f"<title>Rapport_Climat_{timestamp}</title>",
+        f"<title>{report_title}_{timestamp}</title>",
         _get_report_css(),
         "</head><body>",
         "<div class='container'>"
     ])
     
     # Titre principal
-    report_title = f"Rapport d'Analyse de Risque Climatique_{timestamp}"
-    parts.append(f"<h1>{report_title}</h1>")
+    parts.append(f"<h1>{report_title}_{timestamp}</h1>")
     
     # Info box avec informations générales
     parts.append("<div class='info-box'>")
@@ -497,54 +502,55 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
     parts.append("</div>")
     
     # Section 1: Données brutes
-    parts.append("<h2>1. Données brutes</h2>")
-    
-    if isinstance(df, pd.DataFrame):
-        # Métriques principales
-        parts.append("<div class='metric-box'>")
-        parts.append("<span class='metric-label'>Nombre de lignes</span>")
-        parts.append(f"<span class='metric-value'>{df.shape[0]:,}</span>")
-        parts.append("</div>")
+    if not selected_sections or "data_analysis" in selected_sections:
+        parts.append("<h2>1. Données brutes</h2>")
         
-        parts.append("<div class='metric-box'>")
-        parts.append("<span class='metric-label'>Nombre de colonnes</span>")
-        parts.append(f"<span class='metric-value'>{df.shape[1]}</span>")
-        parts.append("</div>")
-        
-        missing_values = df.isnull().sum().sum()
-        parts.append("<div class='metric-box'>")
-        parts.append("<span class='metric-label'>Valeurs manquantes</span>")
-        parts.append(f"<span class='metric-value'>{missing_values:,}</span>")
-        parts.append("</div>")
-        
-        # Aperçu des données
-        parts.append("<h3>Aperçu des données (5 premières lignes)</h3>")
-        parts.append(_wrap_table(df.head().to_html(classes='dataframe dataframe', index=False)))
-        
-        # Statistiques descriptives
-        parts.append("<h3>Statistiques descriptives</h3>")
-        parts.append(_wrap_table(df.describe(include='all').round(2).to_html(classes='dataframe dataframe')))
-        
-        # Distributions des variables numériques
-        parts.append("<h3>Distributions des variables numériques</h3>")
-        try:
-            dist_fig = _create_distribution_plot(df)
-            if dist_fig:
-                parts.append(_img_to_base64(dist_fig))
-        except Exception as e:
-            parts.append(f"<div class='warning-box'>Erreur lors de la génération des distributions: {str(e)}</div>")
-        
-        # Matrice de corrélation
-        try:
-            corr_fig = _create_correlation_plot(df)
-            if corr_fig:
-                parts.append("<h3>Matrice de corrélation</h3>")
-                parts.append(_img_to_base64(corr_fig))
-        except Exception as e:
-            parts.append(f"<div class='warning-box'>Erreur lors de la génération de la matrice de corrélation: {str(e)}</div>")
+        if isinstance(df, pd.DataFrame):
+            # Métriques principales
+            parts.append("<div class='metric-box'>")
+            parts.append("<span class='metric-label'>Nombre de lignes</span>")
+            parts.append(f"<span class='metric-value'>{df.shape[0]:,}</span>")
+            parts.append("</div>")
+            
+            parts.append("<div class='metric-box'>")
+            parts.append("<span class='metric-label'>Nombre de colonnes</span>")
+            parts.append(f"<span class='metric-value'>{df.shape[1]}</span>")
+            parts.append("</div>")
+            
+            missing_values = df.isnull().sum().sum()
+            parts.append("<div class='metric-box'>")
+            parts.append("<span class='metric-label'>Valeurs manquantes</span>")
+            parts.append(f"<span class='metric-value'>{missing_values:,}</span>")
+            parts.append("</div>")
+            
+            # Aperçu des données
+            parts.append("<h3>Aperçu des données (5 premières lignes)</h3>")
+            parts.append(_wrap_table(df.head().to_html(classes='dataframe dataframe', index=False)))
+            
+            # Statistiques descriptives
+            parts.append("<h3>Statistiques descriptives</h3>")
+            parts.append(_wrap_table(df.describe(include='all').round(2).to_html(classes='dataframe dataframe')))
+            
+            # Distributions des variables numériques
+            parts.append("<h3>Distributions des variables numériques</h3>")
+            try:
+                dist_fig = _create_distribution_plot(df)
+                if dist_fig:
+                    parts.append(_img_to_base64(dist_fig))
+            except Exception as e:
+                parts.append(f"<div class='warning-box'>Erreur lors de la génération des distributions: {str(e)}</div>")
+            
+            # Matrice de corrélation
+            try:
+                corr_fig = _create_correlation_plot(df)
+                if corr_fig:
+                    parts.append("<h3>Matrice de corrélation</h3>")
+                    parts.append(_img_to_base64(corr_fig))
+            except Exception as e:
+                parts.append(f"<div class='warning-box'>Erreur lors de la génération de la matrice de corrélation: {str(e)}</div>")
     
     # Section 2: Prétraitement
-    if prep_info or isinstance(df_prep, pd.DataFrame):
+    if (prep_info or isinstance(df_prep, pd.DataFrame)) and (not selected_sections or "preprocessing" in selected_sections):
         parts.append("<h2>2. Prétraitement des données</h2>")
         
         if prep_info:
@@ -575,7 +581,7 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
             parts.append(_wrap_table(df_prep.describe(include='all').round(2).to_html(classes='dataframe dataframe')))
     
     # Section 3: Modélisation
-    if model_info:
+    if model_info and (not selected_sections or "modeling" in selected_sections):
         parts.append("<h2>3. Modèle de Machine Learning</h2>")
         
         parts.append("<div class='info-box'>")
@@ -627,15 +633,16 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                 parts.append(_wrap_table(imp_df.to_html(classes='dataframe dataframe', index=False)))
                 
                 # Graphique d'importance
-                try:
-                    imp_fig = _create_feature_importance_plot(feat_names, feat_imp)
-                    if imp_fig:
-                        parts.append(_img_to_base64(imp_fig))
-                except Exception as e:
-                    parts.append(f"<div class='warning-box'>Erreur lors de la génération du graphique d'importance: {str(e)}</div>")
+                if not selected_sections or "visualizations" in selected_sections:
+                    try:
+                        imp_fig = _create_feature_importance_plot(feat_names, feat_imp)
+                        if imp_fig:
+                            parts.append(_img_to_base64(imp_fig))
+                    except Exception as e:
+                        parts.append(f"<div class='warning-box'>Erreur lors de la génération du graphique d'importance: {str(e)}</div>")
     
     # Section 4: Évaluation des performances
-    if model_info:
+    if model_info and (not selected_sections or "visualizations" in selected_sections):
         parts.append("<h2>4. Évaluation des performances</h2>")
         
         # Métriques de performance
@@ -669,91 +676,115 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
             parts.append(f"<div class='warning-box'>Erreur lors de la génération des graphiques d'évaluation: {str(e)}</div>")
     
     # Section 5: Cartographie (dernière carte tracée)
-    parts.append("<h2>5. Cartographie et Analyse Spatiale</h2>")
-    
-    # Vérifier si des données géospatiales sont disponibles
-    has_geo_data = False
-    geo_cols = []
-    
-    if isinstance(df, pd.DataFrame):
-        # Rechercher des colonnes géographiques
-        for col in df.columns:
-            col_lower = col.lower()
-            if any(keyword in col_lower for keyword in ['lat', 'latitude', 'lon', 'longitude', 'x', 'y']):
-                geo_cols.append(col)
-                has_geo_data = True
-    
-    if has_geo_data:
-        parts.append("<div class='info-box'>")
-        parts.append("<h3>Données géospatiales détectées</h3>")
-        parts.append(f"<p>Colonnes géographiques trouvées : {', '.join(geo_cols)}</p>")
+    if not selected_sections or "cartography" in selected_sections:
+        parts.append("<h2>5. Cartographie et Analyse Spatiale</h2>")
         
-        # Statistiques géospatiales
-        parts.append("<h4>Statistiques géospatiales</h4>")
-        for col in geo_cols[:4]:  # Limiter à 4 colonnes
-            if col in df.columns:
-                stats = df[col].describe()
-                parts.append(f"""
-                    <div class='metric-box'>
-                        <span class='metric-label'>{col}</span>
-                        <span class='metric-value'>{stats['mean']:.4f}</span>
+        # Vérifier si des données géospatiales sont disponibles
+        has_geo_data = False
+        geo_cols = []
+        
+        if isinstance(df, pd.DataFrame):
+            # Rechercher des colonnes géographiques
+            for col in df.columns:
+                col_lower = col.lower()
+                if any(keyword in col_lower for keyword in ['lat', 'latitude', 'lon', 'longitude', 'x', 'y']):
+                    geo_cols.append(col)
+                    has_geo_data = True
+        
+        if has_geo_data:
+            parts.append("<div class='info-box'>")
+            parts.append("<h3>Données géospatiales détectées</h3>")
+            parts.append(f"<p>Colonnes géographiques trouvées : {', '.join(geo_cols)}</p>")
+            
+            # Statistiques géospatiales
+            parts.append("<h4>Statistiques géospatiales</h4>")
+            for col in geo_cols[:4]:  # Limiter à 4 colonnes
+                if col in df.columns:
+                    stats = df[col].describe()
+                    parts.append(f"""
+                        <div class='metric-box'>
+                            <span class='metric-label'>{col}</span>
+                            <span class='metric-value'>{stats['mean']:.4f}</span>
+                        </div>
+                    """)
+            
+            parts.append("</div>")
+            
+            # Essayer de créer une carte
+            try:
+                import folium
+                
+                if len(geo_cols) >= 2:
+                    lat_col = geo_cols[0] if 'lat' in geo_cols[0].lower() else geo_cols[1]
+                    lon_col = geo_cols[1] if 'lon' in geo_cols[1].lower() else geo_cols[0]
+                    
+                    # Calculer le centre
+                    valid_data = df[[lat_col, lon_col]].dropna()
+                    if len(valid_data) > 0:
+                        center_lat = valid_data[lat_col].mean()
+                        center_lon = valid_data[lon_col].mean()
+                        
+                        # Créer la carte
+                        m = folium.Map(location=[center_lat, center_lon], zoom_start=10)
+                        
+                        # Ajouter des points pour les 100 premières observations
+                        sample_data = valid_data.head(100)
+                        for idx, row in sample_data.iterrows():
+                            folium.CircleMarker(
+                                location=[row[lat_col], row[lon_col]],
+                                radius=5,
+                                popup=f"Point {idx}",
+                                color='#667eea',
+                                fill=True,
+                                fillColor='#667eea'
+                            ).add_to(m)
+                        
+                        # Sauvegarder la carte
+                        map_html = m._repr_html_()
+                        parts.append("<div class='figure-container'>")
+                        parts.append(map_html)
+                        parts.append("</div>")
+                        
+            except ImportError:
+                parts.append("""
+                    <div class='warning-box'>
+                        <h4>Bibliothèque cartographique non disponible</h4>
+                        <p>Pour afficher les cartes, installez la bibliothèque folium : pip install folium</p>
                     </div>
                 """)
-        
-        parts.append("</div>")
-        
-        # Essayer de créer une carte
-        try:
-            import folium
-            
-            if len(geo_cols) >= 2:
-                lat_col = geo_cols[0] if 'lat' in geo_cols[0].lower() else geo_cols[1]
-                lon_col = geo_cols[1] if 'lon' in geo_cols[1].lower() else geo_cols[0]
-                
-                # Calculer le centre
-                valid_data = df[[lat_col, lon_col]].dropna()
-                if len(valid_data) > 0:
-                    center_lat = valid_data[lat_col].mean()
-                    center_lon = valid_data[lon_col].mean()
-                    
-                    # Créer la carte
-                    m = folium.Map(location=[center_lat, center_lon], zoom_start=10)
-                    
-                    # Ajouter des points pour les 100 premières observations
-                    sample_data = valid_data.head(100)
-                    for idx, row in sample_data.iterrows():
-                        folium.CircleMarker(
-                            location=[row[lat_col], row[lon_col]],
-                            radius=5,
-                            popup=f"Point {idx}",
-                            color='#667eea',
-                            fill=True,
-                            fillColor='#667eea'
-                        ).add_to(m)
-                    
-                    # Sauvegarder la carte
-                    map_html = m._repr_html_()
-                    parts.append("<div class='figure-container'>")
-                    parts.append(map_html)
-                    parts.append("</div>")
-                    
-        except ImportError:
+            except Exception as e:
+                parts.append(f"<div class='warning-box'>Erreur lors de la génération de la carte: {str(e)}</div>")
+        else:
             parts.append("""
                 <div class='warning-box'>
-                    <h4>Bibliothèque cartographique non disponible</h4>
-                    <p>Pour afficher les cartes, installez la bibliothèque folium : pip install folium</p>
+                    <h4>Aucune donnée géospatiale détectée</h4>
+                    <p>Pour inclure des cartes dans le rapport, assurez-vous que vos données contiennent des colonnes de coordonnées (latitude/longitude).</p>
+                    <p>Colonnes attendues : latitude, longitude, lat, lon, x, y</p>
                 </div>
             """)
-        except Exception as e:
-            parts.append(f"<div class='warning-box'>Erreur lors de la génération de la carte: {str(e)}</div>")
-    else:
-        parts.append("""
-            <div class='warning-box'>
-                <h4>Aucune donnée géospatiale détectée</h4>
-                <p>Pour inclure des cartes dans le rapport, assurez-vous que vos données contiennent des colonnes de coordonnées (latitude/longitude).</p>
-                <p>Colonnes attendues : latitude, longitude, lat, lon, x, y</p>
-            </div>
-        """)
+    
+    # Section 6: Recommandations
+    if not selected_sections or "recommendations" in selected_sections:
+        parts.append("<h2>6. Recommandations et Perspectives</h2>")
+        parts.append("<div class='info-box'>")
+        parts.append("<h3>Recommandations basées sur l'analyse</h3>")
+        parts.append("<ul>")
+        
+        if isinstance(df, pd.DataFrame):
+            missing_pct = (df.isnull().sum().sum() / (df.shape[0] * df.shape[1])) * 100
+            if missing_pct > 10:
+                parts.append("<li><strong>Qualité des données :</strong> Considérer l'imputation des valeurs manquantes ou la collecte de données complémentaires.</li>")
+            else:
+                parts.append("<li><strong>Qualité des données :</strong> La qualité des données est acceptable pour l'analyse.</li>")
+        
+        if model_info:
+            parts.append("<li><strong>Modélisation :</strong> Le modèle actuel peut être amélioré avec des features supplémentaires et l'optimisation des hyperparamètres.</li>")
+            parts.append("<li><strong>Validation :</strong> Recommander la validation croisée pour une meilleure évaluation des performances.</li>")
+        
+        parts.append("<li><strong>Analyses futures :</strong> Envisager des analyses temporelles et spatiales plus approfondies.</li>")
+        parts.append("<li><strong>Monitoring :</strong> Mettre en place un système de surveillance continue des indicateurs climatiques.</li>")
+        parts.append("</ul>")
+        parts.append("</div>")
     
     # Footer
     parts.append("<div class='footer'>")
@@ -789,7 +820,7 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
 
 
 def show_climate_reporting_summary(session_state: dict) -> None:
-    """Affiche l'interface de génération de rapport dans Streamlit."""
+    """Affiche l'interface de génération de rapport dans Streamlit avec options de personnalisation."""
     import streamlit as st
     
     st.subheader("📝 Générer un rapport d'analyse climatique")
@@ -798,6 +829,10 @@ def show_climate_reporting_summary(session_state: dict) -> None:
     has_data = "clim_data" in session_state and session_state["clim_data"] is not None
     has_prep = "clim_data_prep" in session_state and session_state["clim_data_prep"] is not None
     has_model = "clim_model_info" in session_state and session_state["clim_model_info"] is not None
+    
+    if not has_data:
+        st.warning("⚠️ Aucune donnée n'a été chargée. Veuillez d'abord charger des données depuis l'onglet 'Chargement des Données'.")
+        return
     
     # Affichage du statut
     col1, col2, col3 = st.columns(3)
@@ -808,27 +843,116 @@ def show_climate_reporting_summary(session_state: dict) -> None:
     with col3:
         st.metric("Modèle", "✅ Disponible" if has_model else "❌ Manquant")
     
+    # Options de personnalisation du rapport
+    st.markdown("---")
+    st.subheader("⚙️ Configuration du Rapport")
+    
+    # Organisation en colonnes pour une meilleure présentation
+    col_left, col_right = st.columns([2, 1])
+    
+    with col_left:
+        st.markdown("##### 📋 Sections à inclure")
+        
+        # Sélection des sections à inclure avec une meilleure disposition
+        sections = [
+            ("📋 Synthèse Exécutive", "exec_summary", True),
+            ("📊 Analyse des Données", "data_analysis", True),
+            ("🔧 Prétraitement", "preprocessing", has_prep),
+            ("🤖 Modélisation", "modeling", has_model),
+            ("📈 Visualisations", "visualizations", has_prep or has_model),
+            ("🗺️ Cartographie", "cartography", True),
+            ("📝 Recommandations", "recommendations", True)
+        ]
+        
+        selected_sections = []
+        # Afficher les sections en 2 colonnes pour une meilleure lisibilité
+        cols = st.columns(2)
+        for i, (name, key, enabled) in enumerate(sections):
+            with cols[i % 2]:
+                if st.checkbox(name, value=enabled, key=f"report_section_{key}", disabled=not enabled):
+                    selected_sections.append(key)
+    
+    with col_right:
+        st.markdown("##### ⚙️ Options avancées")
+        report_title = st.text_input("Titre du rapport", "Rapport d'Analyse Climatique")
+        include_code = st.checkbox("Inclure le code source", value=False)
+        
+        # Informations sur le rapport
+        st.markdown("##### 📊 Informations")
+        info_text = f"""
+        **Données disponibles :**
+        - {'✅' if has_data else '❌'} Données brutes
+        - {'✅' if has_prep else '❌'} Données prétraitées
+        - {'✅' if has_model else '❌'} Modèle entraîné
+        
+        **Sections sélectionnées :** {len(selected_sections)}/{len(sections)}
+        """
+        st.info(info_text)
+        
     # Bouton de génération
-    if has_data:
-        if st.button("🚀 Générer le rapport", type="primary", use_container_width=True):
+    st.markdown("---")
+    st.subheader("📤 Exporter le Rapport")
+    
+    # Centrer le bouton de génération
+    col_generate, col_empty = st.columns([1, 1])
+    with col_generate:
+        if st.button("� Générer le rapport HTML", type="primary", use_container_width=True):
             with st.spinner("Génération du rapport en cours..."):
                 try:
-                    report_path = generate_climate_report(session_state)
+                    # Créer une copie du contexte avec les sections sélectionnées
+                    report_context = {
+                        **session_state,
+                        "report_options": {
+                            "sections": selected_sections,
+                            "title": report_title,
+                            "include_code": include_code
+                        }
+                    }
+                    
+                    report_path = generate_climate_report(report_context)
                     if report_path:
-                        st.success("✅ Rapport généré avec succès!")
+                        st.success("✅ Rapport généré avec succès !")
                         st.info(f"📄 Rapport sauvegardé : {report_path}")
                         
-                        # Bouton de téléchargement
-                        with open(report_path, 'r', encoding='utf-8') as f:
+                        # Affichage du bouton de téléchargement
+                        with open(report_path, "rb") as f:
                             st.download_button(
                                 label="📥 Télécharger le rapport",
-                                data=f.read(),
+                                data=f,
                                 file_name=f"Rapport_Climat_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
-                                mime="text/html"
+                                mime="text/html",
+                                use_container_width=True,
+                                type="primary"
                             )
+                            
+                        # Aperçu intégré
+                        st.markdown("---")
+                        st.subheader("👁️ Aperçu du rapport")
+                        st.components.v1.html(
+                            open(report_path, "r", encoding="utf-8").read(), 
+                            height=600, 
+                            scrolling=True
+                        )
                     else:
                         st.error("❌ Erreur lors de la génération du rapport")
+                        
                 except Exception as e:
-                    st.error(f"❌ Erreur: {str(e)}")
-    else:
-        st.warning("⚠️ Veuillez d'abord charger des données pour générer un rapport.")
+                    st.error(f"❌ Erreur : {str(e)}")
+                    st.exception(e)  # Afficher plus de détails sur l'erreur
+    
+    with col_empty:
+        # Informations supplémentaires sur le rapport
+        st.markdown("##### 📝 Fonctionnalités")
+        st.info("""
+        **Fonctionnalités du rapport :**
+        - 📊 Visualisations interactives
+        - 📋 Tableaux de données détaillés
+        - 🎨 Design moderne et responsive
+        - 📱 Compatible mobile
+        - 🖨️ Optimisé pour l'impression
+        - Personnalisation des sections incluses
+        - Génération rapide même avec des données partielles
+        - Aperçu intégré avant téléchargement
+        - Options avancées de personnalisation
+        - 🗺️ Cartographie intégrée
+        """)
