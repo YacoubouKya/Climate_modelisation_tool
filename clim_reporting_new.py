@@ -638,6 +638,18 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
             parts.append(f"<p><strong>Ratio :</strong> {test_shape[0]/(train_shape[0] + test_shape[0])*100:.1f}%</p>")
             parts.append("</div>")
             parts.append("</div>")
+        else:
+            # Debug: afficher les clés disponibles
+            parts.append("<h3>Debug - Informations disponibles dans model_info</h3>")
+            parts.append("<div class='info-box'>")
+            parts.append("<p><strong>Clés disponibles :</strong></p>")
+            parts.append("<ul>")
+            for key in model_info.keys():
+                parts.append(f"<li>{key}: {type(model_info[key])}</li>")
+            parts.append("</ul>")
+            parts.append(f"<p><strong>train_shape présent :</strong> {'train_shape' in model_info}</p>")
+            parts.append(f"<p><strong>test_shape présent :</strong> {'test_shape' in model_info}</p>")
+            parts.append("</div>")
         
         # Importance des features
         if "feature_importance" in model_info and "feature_names" in model_info:
@@ -671,6 +683,23 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                         parts.append(_img_to_base64(imp_fig))
                 except Exception as e:
                     parts.append(f"<div class='warning-box'>Erreur lors de la génération du graphique d'importance: {str(e)}</div>")
+            else:
+                parts.append("<div class='warning-box'>Données d'importance des features invalides ou vides</div>")
+        else:
+            # Debug: afficher pourquoi les features ne sont pas disponibles
+            parts.append("<h3>Debug - Importance des features</h3>")
+            parts.append("<div class='info-box'>")
+            parts.append(f"<p><strong>feature_importance présent :</strong> {'feature_importance' in model_info}</p>")
+            parts.append(f"<p><strong>feature_names présent :</strong> {'feature_names' in model_info}</p>")
+            if "feature_importance" in model_info:
+                feat_imp = model_info["feature_importance"]
+                parts.append(f"<p><strong>Type feature_importance :</strong> {type(feat_imp)}</p>")
+                parts.append(f"<p><strong>Longueur feature_importance :</strong> {len(feat_imp) if feat_imp is not None else 'None'}</p>")
+            if "feature_names" in model_info:
+                feat_names = model_info["feature_names"]
+                parts.append(f"<p><strong>Type feature_names :</strong> {type(feat_names)}</p>")
+                parts.append(f"<p><strong>Longueur feature_names :</strong> {len(feat_names) if feat_names is not None else 'None'}</p>")
+            parts.append("</div>")
     
     # Section 4: Évaluation des performances
     if model_info and (not selected_sections or "visualizations" in selected_sections):
