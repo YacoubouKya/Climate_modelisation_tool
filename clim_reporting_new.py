@@ -1092,7 +1092,11 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                                 """)
                         parts.append("</div>")
                         
-                        m3 = folium.Map(location=[center_lat, center_lon], zoom_start=10)
+                        try:
+                            m3 = folium.Map(location=[center_lat, center_lon], zoom_start=10)
+                        except Exception as e:
+                            parts.append(f"<p><em>⚠️ Erreur création carte: {str(e)}</em></p>")
+                            return None
                         
                         # Créer une carte pour la variable cible
                         var_data = df[target_variable].dropna()
@@ -1100,51 +1104,68 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                             is_numeric = pd.api.types.is_numeric_dtype(var_data)
                             
                             if is_numeric:
-                                # Variable numérique : utiliser une colormap
-                                min_val = var_data.min()
-                                max_val = var_data.max()
-                                
-                                # Éviter les problèmes si min_val == max_val
-                                if min_val == max_val:
-                                    max_val = min_val + 1
-                                
-                                # Créer une colormap avec plus de couleurs pour meilleure distinction
-                                colormap = cm.LinearColormap(['#2E86AB', '#A23B72', '#F18F01', '#C73E1D'], 
-                                                             vmin=min_val, vmax=max_val)
-                                colormap.caption = f'{target_variable} ({min_val:.2f} - {max_val:.2f})'
-                                colormap.position = 'bottomright'
-                                
-                                # Ajouter les points colorés avec taille variable selon la valeur
-                                color_data = df[[lat_col, lon_col, target_variable]].dropna().head(300)  # Plus de points
-                                for idx, row in color_data.iterrows():
-                                    # Normaliser la valeur pour la taille du point
-                                    normalized_val = (row[target_variable] - min_val) / (max_val - min_val) if max_val != min_val else 0.5
-                                    radius = 3 + normalized_val * 7  # Taille entre 3 et 10
+                                # Variable numérique : utiliser une colormap simple
+                                try:
+                                    min_val = var_data.min()
+                                    max_val = var_data.max()
                                     
-                                    color = colormap(row[target_variable])
-                                    popup_text = f"""
-                                    <div style='width: 200px;'>
-                                        <h5>Point #{idx}</h5>
-                                        <p><strong>Latitude:</strong> {row[lat_col]:.4f}</p>
-                                        <p><strong>Longitude:</strong> {row[lon_col]:.4f}</p>
-                                        <p><strong>{target_variable}:</strong> <span style='color: {color}; font-weight: bold;'>{row[target_variable]:.2f}</span></p>
-                                        <p><small>Percentile: {(normalized_val * 100):.1f}%</small></p>
-                                    </div>
-                                    """
-                                    folium.CircleMarker(
-                                        location=[row[lat_col], row[lon_col]],
-                                        radius=radius,
-                                        popup=folium.Popup(popup_text, max_width=250),
-                                        tooltip=f"{target_variable}: {row[target_variable]:.2f}",
-                                        color=color,
-                                        fill=True,
-                                        fillColor=color,
-                                        fillOpacity=0.8,
-                                        weight=2
-                                    ).add_to(m3)
-                                
-                                # Ajouter la colormap à la carte
-                                m3.add_child(colormap)
+                                    # Éviter les problèmes si min_val == max_val
+                                    if min_val == max_val:
+                                        max_val = min_val + 1
+                                    
+                                    # Créer une colormap simple
+                                    colormap = cm.LinearColormap(['blue', 'green', 'yellow', 'red'], 
+                                                                 vmin=min_val, vmax=max_val)
+                                    colormap.caption = f'{target_variable} ({min_val:.2f} - {max_val:.2f})'
+                                    colormap.position = 'bottomright'
+                                    
+                                    # Ajouter les points colorés avec taille variable selon la valeur
+                                    color_data = df[[lat_col, lon_col, target_variable]].dropna().head(300)
+                                    for idx, row in color_data.iterrows():
+                                        # Normaliser la valeur pour la taille du point
+                                        normalized_val = (row[target_variable] - min_val) / (max_val - min_val) if max_val != min_val else 0.5
+                                        radius = 3 + normalized_val * 7  # Taille entre 3 et 10
+                                        
+                                        color = colormap(row[target_variable])
+                                        popup_text = f"""
+                                        <div style='width: 200px;'>
+                                            <h5>Point #{idx}</h5>
+                                            <p><strong>Latitude:</strong> {row[lat_col]:.4f}</p>
+                                            <p><strong>Longitude:</strong> {row[lon_col]:.4f}</p>
+                                            <p><strong>{target_variable}:</strong> <span style='color: {color}; font-weight: bold;'>{row[target_variable]:.2f}</span></p>
+                                            <p><small>Percentile: {(normalized_val * 100):.1f}%</small></p>
+                                        </div>
+                                        """
+                                        folium.CircleMarker(
+                                            location=[row[lat_col], row[lon_col]],
+                                            radius=radius,
+                                            popup=folium.Popup(popup_text, max_width=250),
+                                            tooltip=f"{target_variable}: {row[target_variable]:.2f}",
+                                            color=color,
+                                            fill=True,
+                                            fillColor=color,
+                                            fillOpacity=0.8,
+                                            weight=2
+                                        ).add_to(m3)
+                                    
+                                    # Ajouter la colormap à la carte
+                                    m3.add_child(colormap)
+                                    
+                                except Exception as e:
+                                    # En cas d'erreur avec la colormap, utiliser des points bleus simples
+                                    parts.append(f"<p><em>⚠️ Erreur de colormap: {str(e)}</em></p>")
+                                    color_data = df[[lat_col, lon_col]].dropna().head(300)
+                                    for idx, row in color_data.iterrows():
+                                        folium.CircleMarker(
+                                            location=[row[lat_col], row[lon_col]],
+                                            radius=5,
+                                            popup=f"Point #{idx}",
+                                            tooltip=f"Point {idx}",
+                                            color='blue',
+                                            fill=True,
+                                            fillColor='blue',
+                                            fillOpacity=0.7
+                                        ).add_to(m3)
                             else:
                                 # Variable catégorielle : utiliser des couleurs fixes par catégorie
                                 unique_values = var_data.unique()
@@ -1192,20 +1213,9 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                                         weight=2
                                     ).add_to(m3)
                             
-                            # Ajouter des contrôles de couches avec attributions
-                            folium.TileLayer(
-                                tiles='OpenStreetMap',
-                                attr='© OpenStreetMap contributors'
-                            ).add_to(m3)
-                            folium.TileLayer(
-                                tiles='Stamen Terrain',
-                                attr='Map tiles by Stamen Design, under CC BY 3.0'
-                            ).add_to(m3)
-                            folium.TileLayer(
-                                tiles='CartoDB positron',
-                                attr='© CartoDB'
-                            ).add_to(m3)
-                            folium.LayerControl().add_to(m3)
+                            # La carte utilise déjà les tuiles OpenStreetMap par défaut
+                            # Pas besoin d'ajouter des contrôles de couches supplémentaires
+                            # folium.LayerControl().add_to(m3)  # Commenté pour éviter l'erreur
                             
                             map_html3 = m3._repr_html_()
                             parts.append("<div class='figure-container'>")
