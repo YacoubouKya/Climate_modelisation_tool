@@ -186,7 +186,13 @@ def get_feature_importance(pipeline: Pipeline) -> tuple[list[str], list[float]] 
         if not hasattr(pipeline, 'named_steps'):
             return None
         
-        model = pipeline.named_steps.get("model")
+        # Chercher le modèle dans classifier ou regressor (selon le type de tâche)
+        model = pipeline.named_steps.get("classifier")
+        if not model:
+            model = pipeline.named_steps.get("regressor")
+        if not model:
+            model = pipeline.named_steps.get("model")  # Fallback
+        
         if not model or not hasattr(model, "feature_importances_"):
             return None
         
