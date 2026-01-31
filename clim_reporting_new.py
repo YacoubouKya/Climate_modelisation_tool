@@ -626,29 +626,56 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
             parts.append("<div class='card'>")
             parts.append("<h4>Ensemble d'entraînement</h4>")
             train_shape = model_info["train_shape"]
-            parts.append(f"<p><strong>Features (X_train) :</strong> {train_shape[0]:,} × {train_shape[1]}</p>")
-            parts.append(f"<p><strong>Cible (y_train) :</strong> {train_shape[0]:,} valeurs</p>")
-            parts.append(f"<p><strong>Ratio :</strong> {train_shape[0]/(train_shape[0] + model_info['test_shape'][0])*100:.1f}%</p>")
+            if train_shape is not None:
+                parts.append(f"<p><strong>Features (X_train) :</strong> {train_shape[0]:,} × {train_shape[1]}</p>")
+                parts.append(f"<p><strong>Cible (y_train) :</strong> {train_shape[0]:,} valeurs</p>")
+                parts.append(f"<p><strong>Ratio :</strong> {train_shape[0]/(train_shape[0] + model_info['test_shape'][0])*100:.1f}%</p>")
+            else:
+                parts.append("<p><strong>train_shape est None</strong></p>")
             parts.append("</div>")
             parts.append("<div class='card'>")
             parts.append("<h4>Ensemble de test</h4>")
             test_shape = model_info["test_shape"]
-            parts.append(f"<p><strong>Features (X_test) :</strong> {test_shape[0]:,} × {test_shape[1]}</p>")
-            parts.append(f"<p><strong>Cible (y_test) :</strong> {test_shape[0]:,} valeurs</p>")
-            parts.append(f"<p><strong>Ratio :</strong> {test_shape[0]/(train_shape[0] + test_shape[0])*100:.1f}%</p>")
+            if test_shape is not None:
+                parts.append(f"<p><strong>Features (X_test) :</strong> {test_shape[0]:,} × {test_shape[1]}</p>")
+                parts.append(f"<p><strong>Cible (y_test) :</strong> {test_shape[0]:,} valeurs</p>")
+                parts.append(f"<p><strong>Ratio :</strong> {test_shape[0]/(train_shape[0] + test_shape[0])*100:.1f}%</p>")
+            else:
+                parts.append("<p><strong>test_shape est None</strong></p>")
             parts.append("</div>")
             parts.append("</div>")
         else:
-            # Debug: afficher les clés disponibles
+            # Debug: afficher les clés disponibles avec leurs valeurs
             parts.append("<h3>Debug - Informations disponibles dans model_info</h3>")
             parts.append("<div class='info-box'>")
-            parts.append("<p><strong>Clés disponibles :</strong></p>")
+            parts.append("<p><strong>Clés disponibles avec valeurs :</strong></p>")
             parts.append("<ul>")
             for key in model_info.keys():
-                parts.append(f"<li>{key}: {type(model_info[key])}</li>")
+                value = model_info[key]
+                if hasattr(value, 'shape'):
+                    parts.append(f"<li>{key}: {type(value)} - Shape: {value.shape}</li>")
+                elif value is None:
+                    parts.append(f"<li>{key}: {type(value)} - VALEUR: None</li>")
+                elif isinstance(value, (list, tuple)) and len(value) > 0:
+                    parts.append(f"<li>{key}: {type(value)} - Longueur: {len(value)}</li>")
+                else:
+                    parts.append(f"<li>{key}: {type(value)} - VALEUR: {str(value)[:100]}</li>")
             parts.append("</ul>")
             parts.append(f"<p><strong>train_shape présent :</strong> {'train_shape' in model_info}</p>")
             parts.append(f"<p><strong>test_shape présent :</strong> {'test_shape' in model_info}</p>")
+            parts.append(f"<p><strong>feature_importance présent :</strong> {'feature_importance' in model_info}</p>")
+            parts.append(f"<p><strong>feature_names présent :</strong> {'feature_names' in model_info}</p>")
+            
+            # Vérifier les conditions exactes
+            train_shape_ok = "train_shape" in model_info and model_info["train_shape"] is not None
+            test_shape_ok = "test_shape" in model_info and model_info["test_shape"] is not None
+            feat_imp_ok = "feature_importance" in model_info and model_info["feature_importance"] is not None
+            feat_names_ok = "feature_names" in model_info and model_info["feature_names"] is not None
+            
+            parts.append(f"<p><strong>train_shape condition OK :</strong> {train_shape_ok}</p>")
+            parts.append(f"<p><strong>test_shape condition OK :</strong> {test_shape_ok}</p>")
+            parts.append(f"<p><strong>feature_importance condition OK :</strong> {feat_imp_ok}</p>")
+            parts.append(f"<p><strong>feature_names condition OK :</strong> {feat_names_ok}</p>")
             parts.append("</div>")
         
         # Importance des features
@@ -659,7 +686,7 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
             feat_imp = model_info["feature_importance"]
             feat_names = model_info["feature_names"]
             
-            if len(feat_imp) > 0 and len(feat_names) == len(feat_imp):
+            if feat_imp is not None and feat_names is not None and len(feat_imp) > 0 and len(feat_names) == len(feat_imp):
                 # Créer un tableau d'importance
                 indices = np.argsort(feat_imp)[-10:][::-1]  # Top 10, ordre décroissant
                 importance_data = []
@@ -685,20 +712,46 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
                     parts.append(f"<div class='warning-box'>Erreur lors de la génération du graphique d'importance: {str(e)}</div>")
             else:
                 parts.append("<div class='warning-box'>Données d'importance des features invalides ou vides</div>")
+                parts.append(f"<p>feat_imp is None: {feat_imp is None}</p>")
+                parts.append(f"<p>feat_names is None: {feat_names is None}</p>")
+                if feat_imp is not None:
+                    parts.append(f"<p>len(feat_imp): {len(feat_imp)}</p>")
+                if feat_names is not None:
+                    parts.append(f"<p>len(feat_names): {len(feat_names)}</p>")
         else:
             # Debug: afficher pourquoi les features ne sont pas disponibles
             parts.append("<h3>Debug - Importance des features</h3>")
             parts.append("<div class='info-box'>")
             parts.append(f"<p><strong>feature_importance présent :</strong> {'feature_importance' in model_info}</p>")
             parts.append(f"<p><strong>feature_names présent :</strong> {'feature_names' in model_info}</p>")
+            
             if "feature_importance" in model_info:
                 feat_imp = model_info["feature_importance"]
                 parts.append(f"<p><strong>Type feature_importance :</strong> {type(feat_imp)}</p>")
-                parts.append(f"<p><strong>Longueur feature_importance :</strong> {len(feat_imp) if feat_imp is not None else 'None'}</p>")
+                if feat_imp is None:
+                    parts.append(f"<p><strong>Valeur feature_importance :</strong> None</p>")
+                elif hasattr(feat_imp, 'shape'):
+                    parts.append(f"<p><strong>Shape feature_importance :</strong> {feat_imp.shape}</p>")
+                elif isinstance(feat_imp, (list, tuple)):
+                    parts.append(f"<p><strong>Longueur feature_importance :</strong> {len(feat_imp)}</p>")
+                else:
+                    parts.append(f"<p><strong>Valeur feature_importance :</strong> {str(feat_imp)[:100]}</p>")
+            else:
+                parts.append(f"<p><strong>feature_importance ABSENT de model_info</strong></p>")
+                
             if "feature_names" in model_info:
                 feat_names = model_info["feature_names"]
                 parts.append(f"<p><strong>Type feature_names :</strong> {type(feat_names)}</p>")
-                parts.append(f"<p><strong>Longueur feature_names :</strong> {len(feat_names) if feat_names is not None else 'None'}</p>")
+                if feat_names is None:
+                    parts.append(f"<p><strong>Valeur feature_names :</strong> None</p>")
+                elif isinstance(feat_names, (list, tuple)):
+                    parts.append(f"<p><strong>Longueur feature_names :</strong> {len(feat_names)}</p>")
+                    if len(feat_names) > 0:
+                        parts.append(f"<p><strong>Premiers noms :</strong> {str(feat_names[:3])}</p>")
+                else:
+                    parts.append(f"<p><strong>Valeur feature_names :</strong> {str(feat_names)[:100]}</p>")
+            else:
+                parts.append(f"<p><strong>feature_names ABSENT de model_info</strong></p>")
             parts.append("</div>")
     
     # Section 4: Évaluation des performances
