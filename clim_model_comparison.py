@@ -171,12 +171,20 @@ def train_and_evaluate_model(
                 cv_scores = None
 
         # Feature importance (si disponible)
+        print(f"DEBUG: Pipeline steps: {pipe.named_steps.keys()}")
         feature_info = get_feature_importance(pipe)
         if feature_info:
             feature_names, feature_importance = feature_info
+            print(f"DEBUG: Feature importance trouvée - {len(feature_names)} features")
         else:
             feature_names = None
             feature_importance = None
+            print("DEBUG: Feature importance NON trouvée")
+        
+        print(f"DEBUG: X_train.shape = {X_train.shape}")
+        print(f"DEBUG: X_test.shape = {X_test.shape}")
+        print(f"DEBUG: train_shape = {X_train.shape}")
+        print(f"DEBUG: test_shape = {X_test.shape}")
 
         result = {
             "model_name": model_name,
