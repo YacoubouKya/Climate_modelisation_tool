@@ -360,12 +360,12 @@ def _create_feature_importance_plot(feature_names: List[str], importances: List[
     if not isinstance(importances, np.ndarray):
         importances = np.array(importances)
     
-    # Tri des caractéristiques par importance (décroissant)
-    indices = np.argsort(importances)[-top_n:]
-    indices = indices[::-1]  # Inverser pour avoir le plus important en haut
+    # Trier par ordre décroissant (plus grand en premier)
+    sorted_indices = np.argsort(importances)[::-1]  # [::-1] pour ordre décroissant
+    top_indices = sorted_indices[:top_n]  # Prendre les top_n premiers
     
-    names = [feature_names[i] for i in indices]
-    values = importances[indices]
+    names = [feature_names[i] for i in top_indices]
+    values = importances[top_indices]
     
     # Création du graphique avec fond stylé
     fig, ax = plt.subplots(figsize=(12, 8), facecolor='#f8f9fa')
