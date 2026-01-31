@@ -613,6 +613,27 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
     if model_info and (not selected_sections or "modeling" in selected_sections):
         parts.append("<h2>3. Modèle de Machine Learning</h2>")
         
+        # Vérification temporaire des clés disponibles
+        parts.append("<div class='info-box'>")
+        parts.append("<p><strong>Vérification des clés model_info :</strong></p>")
+        parts.append("<ul>")
+        keys_to_check = ["train_shape", "test_shape", "feature_importance", "feature_names"]
+        for key in keys_to_check:
+            if key in model_info:
+                value = model_info[key]
+                if value is None:
+                    parts.append(f"<li>{key}: Présent mais None</li>")
+                elif hasattr(value, 'shape'):
+                    parts.append(f"<li>{key}: Présent - Shape {value.shape}</li>")
+                elif isinstance(value, (list, tuple)):
+                    parts.append(f"<li>{key}: Présent - Longueur {len(value)}</li>")
+                else:
+                    parts.append(f"<li>{key}: Présent - Type {type(value)}</li>")
+            else:
+                parts.append(f"<li>{key}: Absent</li>")
+        parts.append("</ul>")
+        parts.append("</div>")
+        
         parts.append("<div class='info-box'>")
         parts.append(f"<p><strong>Nom du modèle :</strong> {model_info.get('model_name', 'Non spécifié')}</p>")
         parts.append(f"<p><strong>Type de pipeline :</strong> {model_info.get('pipeline_type', 'Standard')}</p>")
