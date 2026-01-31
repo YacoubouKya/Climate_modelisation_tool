@@ -214,6 +214,11 @@ def train_and_evaluate_model(
             "feature_importance": feature_importance,
             "feature_names": feature_names,
         }
+        
+        print(f"DEBUG: Sauvegarde result - train_shape: {result['train_shape']}")
+        print(f"DEBUG: Sauvegarde result - test_shape: {result['test_shape']}")
+        print(f"DEBUG: Sauvegarde result - feature_importance: {result['feature_importance'] is not None}")
+        print(f"DEBUG: Sauvegarde result - feature_names: {result['feature_names'] is not None}")
 
     except Exception as e:
         result = {
