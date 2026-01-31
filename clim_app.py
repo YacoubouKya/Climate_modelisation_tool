@@ -716,6 +716,11 @@ def page_modeling() -> None:
                         "y_pred": result.get("y_pred"),
                         "y_proba": result.get("y_proba"),
                         "X_test": result.get("X_test"),
+                        # Informations manquantes ajoutées
+                        "train_shape": result.get("train_shape"),
+                        "test_shape": result.get("test_shape"),
+                        "feature_importance": result.get("feature_importance"),
+                        "feature_names": result.get("feature_names"),
                     }
                     
                     st.success(f"✅ Modèle entraîné : {result['model_name']}")
@@ -786,6 +791,11 @@ def page_modeling() -> None:
                             "y_pred": best_result.get("y_pred"),
                             "y_proba": best_result.get("y_proba"),
                             "X_test": best_result.get("X_test"),
+                            # Informations manquantes ajoutées
+                            "train_shape": best_result.get("train_shape"),
+                            "test_shape": best_result.get("test_shape"),
+                            "feature_importance": best_result.get("feature_importance"),
+                            "feature_names": best_result.get("feature_names"),
                         }
                         st.session_state["clim_comparison_results"] = results
 
@@ -923,6 +933,11 @@ def page_modeling() -> None:
                                 "mae": tuned_result.get("mae"),
                                 "r2": tuned_result.get("r2"),
                                 "cv_scores": tuned_result["cv_scores"],
+                                # Informations manquantes ajoutées
+                                "train_shape": tuned_result.get("train_shape"),
+                                "test_shape": tuned_result.get("test_shape"),
+                                "feature_importance": tuned_result.get("feature_importance"),
+                                "feature_names": tuned_result.get("feature_names"),
                             }
                             
                             st.success("✅ Modèle affiné sauvegardé !")

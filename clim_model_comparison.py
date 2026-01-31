@@ -170,6 +170,14 @@ def train_and_evaluate_model(
             except Exception:
                 cv_scores = None
 
+        # Feature importance (si disponible)
+        feature_info = get_feature_importance(pipe)
+        if feature_info:
+            feature_names, feature_importance = feature_info
+        else:
+            feature_names = None
+            feature_importance = None
+
         result = {
             "model_name": model_name,
             "pipeline": pipe,
@@ -192,6 +200,11 @@ def train_and_evaluate_model(
             "y_test": y_test,
             "y_pred": y_pred,
             "y_proba": y_proba,
+            # Informations manquantes ajoutées
+            "train_shape": X_train.shape,
+            "test_shape": X_test.shape,
+            "feature_importance": feature_importance,
+            "feature_names": feature_names,
         }
 
     except Exception as e:
