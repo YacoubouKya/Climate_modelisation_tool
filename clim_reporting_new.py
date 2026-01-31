@@ -355,7 +355,7 @@ def _create_correlation_plot(df: pd.DataFrame) -> plt.Figure:
 
 
 def _create_feature_importance_plot(feature_names: List[str], importances: List[float], top_n: int = 10) -> plt.Figure:
-    """Crée un graphique d'importance des caractéristiques."""
+    """Crée un graphique d'importance des caractéristiques avec design stylé."""
     # Convertir en numpy array si nécessaire
     if not isinstance(importances, np.ndarray):
         importances = np.array(importances)
@@ -367,32 +367,64 @@ def _create_feature_importance_plot(feature_names: List[str], importances: List[
     names = [feature_names[i] for i in indices]
     values = importances[indices]
     
-    # Création du graphique
-    fig, ax = plt.subplots(figsize=(10, 6), facecolor='white')
+    # Création du graphique avec fond stylé
+    fig, ax = plt.subplots(figsize=(12, 8), facecolor='#f8f9fa')
     
     # Style du graphique
-    ax.set_facecolor('white')
+    ax.set_facecolor('#ffffff')
     for spine in ax.spines.values():
         spine.set_edgecolor('#e9ecef')
+        spine.set_linewidth(1.5)
     
-    # Tracé des barres
-    y_pos = np.arange(len(names))
-    bars = ax.barh(y_pos, values, align='center', color='#667eea', alpha=0.8)
+    # Créer un dégradé de couleurs du plus foncé au plus clair
+    colors = plt.cm.viridis(np.linspace(0.8, 0.2, len(names)))
     
-    # Ajout des valeurs sur les barres
-    for i, bar in enumerate(bars):
+    # Tracé des barres avec dégradé
+    bars = ax.barh(np.arange(len(names)), values, align='center', color=colors, alpha=0.9, 
+                   edgecolor='#2c3e50', linewidth=1.5, height=0.7)
+    
+    # Ajout des valeurs sur les barres avec style
+    for i, (bar, value) in enumerate(zip(bars, values)):
         width = bar.get_width()
-        ax.text(width * 1.02, bar.get_y() + bar.get_height()/2.,
-                f'{width:.4f}',
-                va='center', ha='left', color='#2c3e50', fontsize=9)
+        # Position du texte
+        text_x = width + (max(values) * 0.02)
+        text_y = bar.get_y() + bar.get_height()/2.
+        
+        # Style du texte
+        ax.text(text_x, text_y, f'{value:.4f}',
+                va='center', ha='left', 
+                color='#2c3e50', fontsize=11, fontweight='600',
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='white', 
+                         edgecolor='#e9ecef', alpha=0.9))
     
-    # Mise en forme
-    ax.set_yticks(y_pos)
-    ax.set_yticklabels(names, color='#2c3e50')
-    ax.set_title(f'Top {top_n} des caractéristiques les plus importantes', 
-                 color='#2c3e50', pad=15, fontsize=14, fontweight='bold')
-    ax.set_xlabel('Importance', color='#2c3e50', fontsize=12)
-    ax.grid(True, axis='x', alpha=0.3, color='#e9ecef')
+    # Mise en forme des axes
+    ax.set_yticks(np.arange(len(names)))
+    ax.set_yticklabels(names, color='#2c3e50', fontsize=12, fontweight='500')
+    ax.set_xlabel('Importance', color='#2c3e50', fontsize=14, fontweight='600', labelpad=15)
+    
+    # Titre stylé
+    ax.set_title(f'Top {top_n} des Caractéristiques les Plus Importantes\n(du plus au moins important)', 
+                 color='#2c3e50', pad=25, fontsize=16, fontweight='bold',
+                 bbox=dict(boxstyle='round,pad=0.5', facecolor='#667eea', 
+                          edgecolor='#5a67d8', alpha=0.1))
+    
+    # Grille stylée
+    ax.grid(True, axis='x', alpha=0.3, color='#e9ecef', linestyle='--', linewidth=1)
+    ax.set_axisbelow(True)
+    
+    # Ajustement des limites pour l'espace du texte
+    max_val = max(values)
+    ax.set_xlim(0, max_val * 1.15)
+    
+    # Ajout d'une annotation pour la direction
+    ax.annotate('Plus important', xy=(0.02, 0.95), xycoords='axes fraction',
+                fontsize=10, color='#667eea', fontweight='600',
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='#667eea', 
+                         edgecolor='#5a67d8', alpha=0.2))
+    ax.annotate('Moins important', xy=(0.02, 0.02), xycoords='axes fraction',
+                fontsize=10, color='#95a5a6', fontweight='600',
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='#95a5a6', 
+                         edgecolor='#7f8c8d', alpha=0.2))
     
     # Ajustement des marges
     plt.tight_layout()
