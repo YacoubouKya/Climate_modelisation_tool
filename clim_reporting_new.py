@@ -354,10 +354,16 @@ def _create_correlation_plot(df: pd.DataFrame) -> plt.Figure:
     return fig
 
 
-def _create_feature_importance_plot(feature_names: List[str], importances: np.ndarray, top_n: int = 10) -> plt.Figure:
+def _create_feature_importance_plot(feature_names: List[str], importances: List[float], top_n: int = 10) -> plt.Figure:
     """Crée un graphique d'importance des caractéristiques."""
-    # Tri des caractéristiques par importance
+    # Convertir en numpy array si nécessaire
+    if not isinstance(importances, np.ndarray):
+        importances = np.array(importances)
+    
+    # Tri des caractéristiques par importance (décroissant)
     indices = np.argsort(importances)[-top_n:]
+    indices = indices[::-1]  # Inverser pour avoir le plus important en haut
+    
     names = [feature_names[i] for i in indices]
     values = importances[indices]
     
@@ -374,22 +380,23 @@ def _create_feature_importance_plot(feature_names: List[str], importances: np.nd
     bars = ax.barh(y_pos, values, align='center', color='#667eea', alpha=0.8)
     
     # Ajout des valeurs sur les barres
-    for bar in bars:
+    for i, bar in enumerate(bars):
         width = bar.get_width()
         ax.text(width * 1.02, bar.get_y() + bar.get_height()/2.,
-                f'{width:.3f}',
+                f'{width:.4f}',
                 va='center', ha='left', color='#2c3e50', fontsize=9)
     
     # Mise en forme
     ax.set_yticks(y_pos)
     ax.set_yticklabels(names, color='#2c3e50')
-    ax.tick_params(axis='x', colors='#6c757d')
     ax.set_title(f'Top {top_n} des caractéristiques les plus importantes', 
                  color='#2c3e50', pad=15, fontsize=14, fontweight='bold')
-    ax.set_xlabel('Importance', color='#6c757d', fontsize=11)
-    ax.grid(True, linestyle='--', alpha=0.2, color='#dee2e6', axis='x')
+    ax.set_xlabel('Importance', color='#2c3e50', fontsize=12)
+    ax.grid(True, axis='x', alpha=0.3, color='#e9ecef')
     
+    # Ajustement des marges
     plt.tight_layout()
+    
     return fig
 
 
