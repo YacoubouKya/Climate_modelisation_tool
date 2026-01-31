@@ -174,11 +174,9 @@ def run_climate_modeling(
     feature_info = get_feature_importance(pipeline)
     if feature_info:
         feature_names, feature_importance = feature_info
-        print(f"DEBUG: Feature importance trouvée - {len(feature_names)} features")
     else:
         feature_names = None
         feature_importance = None
-        print("DEBUG: Feature importance NON trouvée")
 
     info: Dict[str, object] = {
         "X_train": X_train,
@@ -209,12 +207,5 @@ def run_climate_modeling(
         "handle_imbalance": handle_imbalance,
         "use_time_validation": use_time_validation,
     }
-    
-    # Debug: vérifier ce qui est sauvegardé
-    print(f"DEBUG: train_shape sauvegardé: {train_shape in info}")
-    print(f"DEBUG: test_shape sauvegardé: {test_shape in info}")
-    print(f"DEBUG: feature_importance sauvegardé: {feature_importance is not None}")
-    print(f"DEBUG: feature_names sauvegardé: {feature_names is not None}")
-    print(f"DEBUG: Clés dans info: {list(info.keys())}")
 
     return pipeline, info
