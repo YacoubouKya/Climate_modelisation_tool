@@ -32,7 +32,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 
 # Importer les utilitaires communs
-from clim_model_utils import detect_task_type, build_preprocessor
+from clim_model_utils import detect_task_type, build_preprocessor, get_feature_importance
 
 
 def get_available_models(task: str, fast_mode: bool = False) -> Dict[str, Any]:
