@@ -654,6 +654,12 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
         parts.append(f"<p><strong>Nom du modèle :</strong> {model_info.get('model_name', 'Non spécifié')}</p>")
         parts.append(f"<p><strong>Type de pipeline :</strong> {model_info.get('pipeline_type', 'Standard')}</p>")
         parts.append(f"<p><strong>Tâche :</strong> {model_info.get('task_type', 'Non spécifié')}</p>")
+        if model_info.get("metric_value") is not None:
+            parts.append(f"<p><strong>{model_info.get('metric_name', 'Score')} (test) :</strong> {model_info['metric_value']:.4f}</p>")
+        if model_info.get("feature_cols"):
+            parts.append(f"<p><strong>Variables explicatives :</strong> {', '.join(model_info['feature_cols'])}</p>")
+        split = f"temporel sur {model_info['time_col']} (test = période la plus récente)" if model_info.get("time_col") else "aléatoire"
+        parts.append(f"<p><strong>Découpage apprentissage / test :</strong> {split}</p>")
         parts.append("</div>")
 
         # Dimensions des ensembles
@@ -788,6 +794,24 @@ def generate_climate_report(session_state: Dict[str, Any]) -> Optional[str]:
             parts.append(f"<div class='warning-box'>Erreur lors de la génération des graphiques d'évaluation: {str(e)}</div>")
 
     # Section 5: Cartographie Avancée
+    pricing_info = session_state.get("clim_pricing")
+    if pricing_info and (not selected_sections or "pricing" in selected_sections):
+        totals = pricing_info["totals"]
+        loads = pricing_info["loadings"]
+        parts.append("<h2>Tarification du risque</h2>")
+        parts.append("<div class='info-box'>")
+        parts.append("<p>Prime pure = fréquence modélisée x coût moyen d'un sinistre, ramenée à l'année et à l'unité exposée. "
+                     "Prime commerciale = prime pure x (1 + sécurité) / (1 - frais - marge).</p>")
+        parts.append(f"<p><strong>Charge annuelle attendue :</strong> {totals['charge_attendue']:,.0f}</p>".replace(",", " "))
+        if totals.get("charge_observee") is not None:
+            parts.append(f"<p><strong>Charge annuelle observée :</strong> {totals['charge_observee']:,.0f}</p>".replace(",", " "))
+        if totals.get("prime_pure_moyenne") is not None:
+            parts.append(f"<p><strong>Prime pure moyenne par unité :</strong> {totals['prime_pure_moyenne']:,.2f}</p>".replace(",", " "))
+            parts.append(f"<p><strong>Prime commerciale moyenne par unité :</strong> {totals['prime_commerciale_moyenne']:,.2f}</p>".replace(",", " "))
+        parts.append(f"<p><strong>Chargements :</strong> sécurité {loads['securite']:.0%}, frais {loads['frais']:.0%}, marge {loads['marge']:.0%}</p>")
+        parts.append("</div>")
+        parts.append(_wrap_table(pricing_info["table"].round(2).to_html(classes="data-table")))
+
     if not selected_sections or "cartography" in selected_sections:
         parts.append("<h2>5. Cartographie et Analyse Spatiale Avancée</h2>")
 
@@ -1560,6 +1584,7 @@ def show_climate_reporting_summary(session_state: dict) -> None:
             ("Prétraitement", "preprocessing", has_prep),
             ("Modélisation", "modeling", has_model),
             ("Visualisations", "visualizations", has_prep or has_model),
+            ("Tarification", "pricing", bool(session_state.get("clim_pricing"))),
             ("Cartographie", "cartography", True),
             ("Recommandations", "recommendations", True)
         ]

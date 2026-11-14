@@ -41,45 +41,61 @@ def aggregate_time_series(
     date_col: str,
     freq: AggregationFreq = "Aucune",
     id_cols: Optional[list[str]] = None,
+    sum_cols: Optional[list[str]] = None,
 ) -> pd.DataFrame:
-    """Agrège des séries temporelles à une fréquence donnée.
+    """Agrège des séries temporelles à une fréquence donnée (par identifiant).
 
-    - freq="Jour"  -> groupby par date normalisée (jour civil)
-    - freq="Mois"  -> groupby par année-mois
-    - freq="Aucune" -> renvoie df tel quel
-
-    Les colonnes numériques sont agrégées par moyenne, les autres sont gardées
-    telles quelles si possible (première valeur du groupe).
+    Règles d'agrégation :
+    - colonnes de `sum_cols` (pluie, coûts...) : somme sur la période ;
+    - colonnes binaires 0/1 (événement observé) : maximum, soit « au moins un
+      événement sur la période » ;
+    - autres colonnes numériques : moyenne ;
+    - colonnes texte constantes dans le groupe (type de zone...) : conservées.
     """
 
-    if freq == "Aucune":
-        return df
-
-    if date_col not in df.columns:
+    if freq == "Aucune" or date_col not in df.columns:
         return df
 
     new_df = df.copy()
     new_df[date_col] = pd.to_datetime(new_df[date_col], errors="coerce")
 
     if freq == "Jour":
-        new_df["_dt_group"] = new_df[date_col].dt.date
+        new_df["_dt_group"] = new_df[date_col].dt.normalize()
     elif freq == "Mois":
         new_df["_dt_group"] = new_df[date_col].dt.to_period("M").dt.to_timestamp()
     else:
         return df
 
-    group_cols = ["_dt_group"]
-    if id_cols:
-        group_cols.extend([c for c in id_cols if c in new_df.columns])
+    group_cols = ["_dt_group"] + [c for c in (id_cols or []) if c in new_df.columns]
+    sum_cols = [c for c in (sum_cols or []) if c in new_df.columns and c not in group_cols]
 
-    # Exclure les colonnes de groupement de l'agrégation pour éviter les doublons
-    num_cols = new_df.select_dtypes(include=["number"]).columns.tolist()
-    num_cols = [c for c in num_cols if c not in group_cols and c != "_dt_group"]
-    agg_dict = {col: "mean" for col in num_cols}
+    agg_dict = {}
+    for col in new_df.columns:
+        if col in group_cols or col == date_col:
+            continue
+        series = new_df[col]
+        if pd.api.types.is_numeric_dtype(series):
+            if col in sum_cols:
+                agg_dict[col] = "sum"
+            elif set(series.dropna().unique()) <= {0, 1}:
+                agg_dict[col] = "max"
+            else:
+                agg_dict[col] = "mean"
+        elif (new_df.groupby(group_cols[1:] or ["_dt_group"])[col].nunique(dropna=True) <= 1).all():
+            agg_dict[col] = "first"
 
     grouped = new_df.groupby(group_cols).agg(agg_dict).reset_index()
-    grouped = grouped.rename(columns={"_dt_group": date_col})
-    return grouped
+    return grouped.rename(columns={"_dt_group": date_col})
+
+
+def _group_rolling(df: pd.DataFrame, cols: List[str], id_cols: Optional[List[str]], window: int, how: str) -> pd.DataFrame:
+    """Statistique glissante calculée séparément pour chaque identifiant (zone, station)."""
+    ids = [c for c in (id_cols or []) if c in df.columns]
+    if ids:
+        rolled = df.groupby(ids, sort=False)[cols].rolling(window=window, min_periods=1).agg(how)
+        rolled = rolled.reset_index(level=list(range(len(ids))), drop=True)
+        return rolled.reindex(df.index)
+    return df[cols].rolling(window=window, min_periods=1).agg(how)
 
 
 def add_rolling_features(
@@ -87,35 +103,20 @@ def add_rolling_features(
     date_col: str,
     value_cols: Optional[List[str]] = None,
     windows: Optional[List[int]] = None,
+    id_cols: Optional[List[str]] = None,
 ) -> pd.DataFrame:
-    """Ajoute des moyennes glissantes pour des colonnes numériques.
-
-    - `windows` est une liste de tailles de fenêtre (en nombre de lignes, supposées
-      déjà triées dans l'ordre temporel).
-    - Les nouvelles colonnes sont nommées `<col>_roll_<window>`.
-    """
-
-    if windows is None:
-        windows = [3, 7]
-
+    """Ajoute des moyennes glissantes `<col>_roll_<n>` (n observations), par identifiant."""
+    windows = windows or [3, 7]
     if date_col not in df.columns:
         return df
-
-    new_df = df.sort_values(date_col).copy()
-
+    new_df = df.sort_values([c for c in (id_cols or []) if c in df.columns] + [date_col]).copy()
     if value_cols is None:
         value_cols = new_df.select_dtypes(include=["number"]).columns.tolist()
-
-    # Vectorisation : créer toutes les colonnes rolling en une seule passe
     valid_cols = [col for col in value_cols if col in new_df.columns]
     for w in windows:
-        # Appliquer rolling sur toutes les colonnes en une fois
-        rolled = new_df[valid_cols].rolling(window=w, min_periods=1).mean()
-        # Renommer les colonnes
+        rolled = _group_rolling(new_df, valid_cols, id_cols, w, "mean")
         rolled.columns = [f"{col}_roll_{w}" for col in valid_cols]
-        # Ajouter au DataFrame
         new_df = pd.concat([new_df, rolled], axis=1)
-
     return new_df
 
 
@@ -156,25 +157,19 @@ def add_cumulative_features(
     df: pd.DataFrame,
     date_col: str,
     value_cols: List[str],
-    windows: List[int] = [7, 30],
+    windows: Optional[List[int]] = None,
+    id_cols: Optional[List[str]] = None,
 ) -> pd.DataFrame:
-    """Ajoute des cumuls glissants sur N jours pour des variables climatiques.
-
-    Utile pour : précipitations cumulées, degrés-jours cumulés, etc.
-    """
-    df_out = df.copy()
-    df_out = df_out.sort_values(date_col)
-
-    # Vectorisation : traiter toutes les colonnes en une passe
+    """Ajoute des cumuls glissants `<col>_cumul_<n>` (pluie cumulée...), par identifiant."""
+    windows = windows or [3, 7]
+    if date_col not in df.columns:
+        return df
+    df_out = df.sort_values([c for c in (id_cols or []) if c in df.columns] + [date_col]).copy()
     valid_cols = [col for col in value_cols if col in df_out.columns]
     for window in windows:
-        # Appliquer rolling sum sur toutes les colonnes en une fois
-        cumul = df_out[valid_cols].rolling(window=window, min_periods=1).sum()
-        # Renommer les colonnes
-        cumul.columns = [f"{col}_cumul_{window}j" for col in valid_cols]
-        # Ajouter au DataFrame
+        cumul = _group_rolling(df_out, valid_cols, id_cols, window, "sum")
+        cumul.columns = [f"{col}_cumul_{window}" for col in valid_cols]
         df_out = pd.concat([df_out, cumul], axis=1)
-
     return df_out
 
 
@@ -289,37 +284,45 @@ def basic_climate_preprocessing(
     rolling_cols: Optional[List[str]] = None,
     detect_anomalies: bool = False,
     anomaly_cols: Optional[List[str]] = None,
+    sum_cols: Optional[List[str]] = None,
+    add_cumul: bool = False,
+    cumul_cols: Optional[List[str]] = None,
+    windows: Optional[List[int]] = None,
 ) -> Tuple[pd.DataFrame, dict]:
-    """Pipeline minimal de prétraitement climatique.
+    """Pipeline de prétraitement climatique.
 
-    Renvoie :
-    - df_prep : DataFrame prétraité
-    - info : petit dictionnaire récapitulatif (utilisé pour l’affichage dans l’app)
+    Ordre : conversion de la date, agrégation, cumuls et moyennes glissantes
+    (calculés séparément pour chaque identifiant), détection d'anomalies.
+    Les fenêtres sont exprimées en nombre de périodes (jours ou mois selon
+    l'agrégation).
+
+    Renvoie le DataFrame prétraité et un résumé pour l'affichage.
     """
-
     info: dict = {}
     df_prep = df.copy()
 
-    # 1) gestion de la date et agrégation
     if date_col:
         df_prep = parse_datetime_column(df_prep, date_col)
         info["date_col"] = date_col
 
     if freq != "Aucune" and date_col:
-        df_prep = aggregate_time_series(df_prep, date_col=date_col, freq=freq, id_cols=id_cols)
+        df_prep = aggregate_time_series(df_prep, date_col=date_col, freq=freq, id_cols=id_cols, sum_cols=sum_cols)
         info["freq"] = freq
 
-    # 2) features temporelles (rolling means)
-    if add_rolling and date_col:
-        df_prep = add_rolling_features(df_prep, date_col=date_col, value_cols=rolling_cols)
-        info["rolling"] = True
+    if add_cumul and date_col and cumul_cols:
+        df_prep = add_cumulative_features(df_prep, date_col=date_col, value_cols=cumul_cols, windows=windows, id_cols=id_cols)
+        info["cumul"] = cumul_cols
 
-    # 3) détection d’anomalies simples par z-score
+    if add_rolling and date_col and rolling_cols:
+        df_prep = add_rolling_features(df_prep, date_col=date_col, value_cols=rolling_cols, windows=windows, id_cols=id_cols)
+        info["rolling"] = rolling_cols
+
     if detect_anomalies:
-        flags, summary = detect_zscore_anomalies(df_prep, value_cols=anomaly_cols)
-        # On ne concatène pas les flags au DataFrame pour éviter de polluer les features
-        # mais on stocke un résumé dans info pour l’affichage dans l’app.
+        _, summary = detect_zscore_anomalies(df_prep, value_cols=anomaly_cols)
         info["anomaly_summary"] = summary
+
+    if date_col and date_col in df_prep.columns:
+        df_prep = df_prep.sort_values([c for c in (id_cols or []) if c in df_prep.columns] + [date_col]).reset_index(drop=True)
 
     info["shape"] = df_prep.shape
     return df_prep, info

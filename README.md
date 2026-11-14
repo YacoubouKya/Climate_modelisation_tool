@@ -2,7 +2,7 @@
 
 Application Streamlit d'analyse et de modélisation du risque climatique, développée
 pour un hackathon : cadrage du projet, chargement de plusieurs sources de données,
-exploration, prétraitement, modélisation, évaluation, cartographie et rapport HTML.
+exploration, prétraitement, modélisation, évaluation, tarification, cartographie et rapport HTML.
 
 Application en ligne : https://climateriskanalytics.streamlit.app/
 
@@ -19,9 +19,10 @@ Application en ligne : https://climateriskanalytics.streamlit.app/
 | Cadrage du projet | Objectif métier (classification, régression, prévision), unité d'analyse, cible, contexte ; repris dans le rapport |
 | Chargement | Plusieurs fichiers CSV ou Excel étiquetés par type (climat, géographie, exposition, événements, autre), fusion automatique |
 | EDA climatique | Aperçu des données et série temporelle d'une variable |
-| Prétraitement | Conversion des dates, agrégation journalière ou mensuelle par identifiant, moyennes glissantes, détection d'anomalies |
-| Modélisation | Modèle unique, comparaison de modèles, affinage des hyperparamètres du meilleur modèle (tous les modèles qui en ont : forêts, boosting, arbre, KNN, régressions régularisées) ; gestion du déséquilibre des classes, validation croisée, mode rapide |
+| Prétraitement | Conversion des dates, agrégation journalière ou mensuelle par identifiant (somme pour les cumuls et les coûts, maximum pour les indicateurs 0/1, moyenne sinon), cumuls et moyennes glissantes calculés par zone, contrôle des valeurs extrêmes |
+| Modélisation | Modèle unique, comparaison de modèles, affinage des hyperparamètres du meilleur modèle (tous les modèles qui en ont : forêts, boosting, arbre, KNN, régressions régularisées) ; choix des variables explicatives avec exclusion automatique des variables qui révèlent la cible (fuite de données), découpage temporel apprentissage / test, gestion du déséquilibre des classes, validation croisée, mode rapide. En classification, la métrique principale est l'AUC ROC, complétée par l'AUC PR |
 | Évaluation | Classification : matrice de confusion, métriques détaillées, courbes précision-rappel et ROC. Régression : prédictions contre valeurs réelles, résidus, métriques orientées risque. Analyse par segment |
+| Tarification | Prime pure = fréquence modélisée x coût moyen d'un sinistre, par segment (zone par exemple) et par unité d'exposition ; recalage de la fréquence sur la sinistralité observée, coût moyen par segment avec crédibilité (Bühlmann), chargements de sécurité, de frais et de marge, ratio observé / attendu, export CSV |
 | Cartographie | Heatmap, points, marqueurs regroupés (Folium) ou gradient 3D (PyDeck), plusieurs fonds de carte, filtre temporel |
 | Reporting | Rapport HTML personnalisable (sections, titre, variable climatique), aperçu intégré et téléchargement |
 
@@ -41,9 +42,11 @@ climatool/
     tuning.py               Hyperparamètres ajustables lors de l'affinage
     evaluation.py           Évaluation du modèle
     maps.py                 Cartographie du risque
+    pricing.py              Tarification : prime pure et prime commerciale
     reporting.py            Rapport HTML
     assets/style.css        Thème visuel (couleurs de base dans .streamlit/config.toml)
 docs/screenshots/           Captures d'écran
+docs/donnees_exemple/       Jeu de données de test (climat, exposition, événements) et son générateur
 ```
 
 ## Installation locale
@@ -56,6 +59,14 @@ source .venv/bin/activate        # Windows : .venv\Scripts\activate
 pip install -r requirements.txt
 streamlit run clim_app.py
 ```
+
+## Données d'exemple
+
+Le dossier `docs/donnees_exemple/` contient un jeu de données synthétique pour tester
+toutes les pages : météo journalière de 8 zones du Togo (2022-2024), exposition par zone
+et inondations avec leur coût. Chargez les trois fichiers avec les types climat,
+exposition et événements, fusionnez, puis suivez les pages dans l'ordre. Le script
+`generer_donnees.py` permet de les recréer.
 
 ## Notes techniques
 
