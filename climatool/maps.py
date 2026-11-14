@@ -447,6 +447,7 @@ def run_maps_page(
     title: str = "Cartographie du risque",
     data_sources: Optional[dict] = None,
     df_prep: Optional[pd.DataFrame] = None,
+    extra_sources: Optional[dict] = None,
 ) -> None:
     """Page Streamlit de cartographie avancée multi-type (optimisée pour gros datasets)."""
 
@@ -460,6 +461,12 @@ def run_maps_page(
 
     available_sources = {}
     source_options = []
+
+    # Sources calculées par l'application (tarification, prédictions, fusion) en premier
+    for label, extra_df in (extra_sources or {}).items():
+        if isinstance(extra_df, pd.DataFrame) and not extra_df.empty:
+            available_sources[label] = extra_df
+            source_options.append(label)
 
     if isinstance(df_prep, pd.DataFrame) and not df_prep.empty:
         available_sources["Données prétraitées (dernier traitement)"] = df_prep
@@ -481,7 +488,7 @@ def run_maps_page(
     selected_source = st.selectbox("Choisir la source de données", source_options, index=0)
     selected_df = available_sources.get(selected_source, df)
 
-    if selected_df.empty:
+    if not isinstance(selected_df, pd.DataFrame) or selected_df.empty:
         st.warning("La source de données sélectionnée est vide.")
         return
 
@@ -519,7 +526,9 @@ def run_maps_page(
     numeric_cols = [c for c in selected_df.select_dtypes(include=["number"]).columns if c not in (lat_col, lon_col)]
     color_col: Optional[str] = None
     if numeric_cols:
-        guess = next((c for c in numeric_cols if any(k in c.lower() for k in ("cout", "sinistre", "inond", "precip"))), None)
+        priorities = ("prime commerciale", "frequence_annuelle_predite", "prime", "cout", "sinistre",
+                      "inond", "precip")
+        guess = next((c for k in priorities for c in numeric_cols if k in c.lower()), None)
         color_options = ["(aucune)"] + numeric_cols
         color_col = st.selectbox("Variable numérique pour le risque (optionnel)", options=color_options,
                                  index=color_options.index(guess) if guess else 0)
@@ -680,5 +689,20 @@ def run_maps_page(
     # Afficher aperçu des données
     st.markdown("---")
     st.subheader("Aperçu des données")
-    preview = map_df.rename(columns={"risk_value": color_col}) if color_col else map_df
-    st.dataframe(preview.head(20), width="stretch", hide_index=True)
+    preview = map_df.rename(columns={"risk_value": color_col}) if color_col else map_df.copy()
+    label_col = next((c for c in ("site", "zone", "commune", "station") if c in df_filtered.columns), None)
+    if label_col is None:
+        label_col = next((c for c in df_filtered.columns if not pd.api.types.is_numeric_dtype(df_filtered[c])
+                          and df_filtered[c].nunique() <= max(len(preview), 1) * 2), None)
+    if label_col and label_col not in (lat_col, lon_col):
+        lab_df = pd.DataFrame({
+            "latitude": pd.to_numeric(df_filtered[lat_col], errors="coerce").astype(float).values,
+            "longitude": pd.to_numeric(df_filtered[lon_col], errors="coerce").astype(float).values,
+            "_label": df_filtered[label_col].values,
+        })
+        labels = lab_df.groupby(["latitude", "longitude"])["_label"].first().rename(label_col)
+        preview = preview.join(labels, on=["latitude", "longitude"])
+        preview = preview[[label_col] + [c for c in preview.columns if c != label_col]]
+    if color_col:
+        preview = preview.sort_values(color_col, ascending=False)
+    st.dataframe(preview.head(50), width="stretch", hide_index=True)

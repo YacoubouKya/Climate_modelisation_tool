@@ -140,7 +140,14 @@ def price_portfolio(
         table["Ratio observé / attendu"] = table["Charge annuelle observée"] / table["Charge annuelle attendue"]
 
     if exposure_col:
-        table["Exposition"] = grouped[exposure_col].mean()
+        # Exposition d'un segment = nombre d'unités assurées présentes à une date donnée.
+        # Avec des données datées (une ligne par site et par jour), on additionne les
+        # sites du segment puis on moyenne sur les dates ; sans date, moyenne simple.
+        if date_col and date_col in data.columns:
+            n_dates = pd.to_datetime(data[date_col], errors="coerce").nunique()
+            table["Exposition"] = grouped[exposure_col].sum() / max(n_dates, 1)
+        else:
+            table["Exposition"] = grouped[exposure_col].mean()
         table["Prime pure par unité"] = table["Charge annuelle attendue"] / table["Exposition"]
     else:
         table["Prime pure par unité"] = table["Charge annuelle attendue"]

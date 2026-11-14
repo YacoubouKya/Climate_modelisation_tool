@@ -25,7 +25,7 @@ Application en ligne : https://climateriskanalytics.streamlit.app/
 | Modélisation | Modèle unique, comparaison de modèles, affinage des hyperparamètres du meilleur modèle (tous les modèles qui en ont : forêts, boosting, arbre, KNN, régressions régularisées) ; choix des variables explicatives avec exclusion automatique des variables qui révèlent la cible (fuite de données), découpage temporel apprentissage / test, gestion du déséquilibre des classes, validation croisée, mode rapide. En classification, la métrique principale est l'AUC ROC, complétée par l'AUC PR |
 | Évaluation | Classification : matrice de confusion, métriques détaillées, courbes précision-rappel et ROC. Régression : prédictions contre valeurs réelles, résidus, métriques orientées risque. Analyse par segment : taux d'événements observé et prédit, rappel et AUC ROC par zone |
 | Tarification | Prime pure = fréquence modélisée x coût moyen d'un sinistre, par segment (zone par exemple) et par unité d'exposition ; recalage de la fréquence sur la sinistralité observée, coût moyen par segment avec crédibilité (Bühlmann), chargements de sécurité, de frais et de marge, ratio observé / attendu, export CSV |
-| Cartographie | Heatmap, points, marqueurs regroupés (Folium) ou gradient 3D (PyDeck), plusieurs fonds de carte, filtre temporel |
+| Cartographie | Données brutes ou fusionnées, fréquence d'inondation prédite par le modèle comparée à la fréquence observée, prime commerciale par segment ; heatmap, points, marqueurs regroupés (Folium) ou colonnes 3D (PyDeck), une valeur par lieu, plusieurs fonds de carte, filtre temporel |
 | Reporting | Rapport HTML personnalisable (sections, titre, variable climatique), aperçu intégré et téléchargement |
 
 Modèles disponibles : Random Forest, Gradient Boosting, régression logistique ou linéaire
@@ -65,10 +65,17 @@ streamlit run clim_app.py
 ## Données d'exemple
 
 Le dossier `docs/donnees_exemple/` contient un jeu de données synthétique pour tester
-toutes les pages : météo journalière de huit communes françaises (2022-2024), portefeuille assuré par commune en euros
-et inondations avec leur coût. Chargez les trois fichiers avec les types climat,
-exposition et événements, fusionnez, puis suivez les pages dans l'ordre. Le script
-`generer_donnees.py` permet de les recréer.
+toutes les pages. Les communes sont réelles ; les quartiers, les relevés et le portefeuille sont inventés.
+
+| Fichier | Type à choisir | Contenu |
+|---|---|---|
+| `climat.csv` | Climat | Météo journalière de huit communes françaises (2022-2024) : pluie, température, humidité |
+| `geographie.csv` | Géographie | Cinq quartiers (sites) par commune : coordonnées, altitude, distance au cours d'eau, zone inondable |
+| `exposition.csv` | Exposition | Portefeuille par site : nombre de biens et valeur assurée moyenne, en euros |
+| `evenements.csv` | Événements | Inondations par site et par jour, et coût des sinistres |
+
+Chargez les quatre fichiers, fusionnez (sur la commune, le site et la date), puis suivez les
+pages dans l'ordre. Le script `generer_donnees.py` permet de les recréer.
 
 ## Notes techniques
 

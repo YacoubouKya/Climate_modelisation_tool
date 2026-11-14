@@ -1,14 +1,19 @@
 """Génère un jeu de données fictif pour tester le Data Tool Climatique.
 
-Trois sources, à charger séparément dans l'application puis à fusionner :
+Quatre sources, à charger séparément dans l'application (types Climat, Géographie,
+Exposition et Événements) puis à fusionner :
 - climat.csv       : relevés quotidiens de huit communes françaises (2022-2024)
-- exposition.csv   : portefeuille assuré par zone
-- evenements.csv   : inondations observées et coût des sinistres
+- geographie.csv   : cinq quartiers (sites) par commune, avec coordonnées, altitude,
+                     distance au cours d'eau et situation en zone inondable
+- exposition.csv   : portefeuille assuré par site (nombre de biens, valeur moyenne)
+- evenements.csv   : inondations observées par site et par jour, et leur coût
 
-La probabilité d'inondation dépend de la pluie cumulée sur 3 jours, de
-l'altitude et du caractère urbain de la zone ; le coût dépend de la valeur
-assurée. Les montants sont en euros. Les données sont entièrement simulées
-(les communes sont réelles, les relevés et le portefeuille sont inventés).
+La fusion se fait sur les colonnes communes : zone (commune), site et date.
+La probabilité d'inondation d'un site dépend de la pluie cumulée sur 3 jours dans
+sa commune, de son altitude, de sa distance au cours d'eau, de sa situation en zone
+inondable et du caractère urbain de la commune ; le coût dépend du nombre de biens
+et de leur valeur. Les montants sont en euros. Les communes sont réelles ; les
+quartiers, les relevés et le portefeuille sont inventés.
 
 Usage : python generer_donnees.py
 """
@@ -20,6 +25,7 @@ import pandas as pd
 
 SEED = 2026
 OUT = Path(__file__).parent
+SITES_PAR_COMMUNE = 5
 
 # Huit communes françaises aux régimes de pluie contrastés. Le portefeuille
 # (nombre de biens, valeurs assurées) est inventé.
@@ -62,27 +68,63 @@ def main() -> None:
         humidite = np.clip(72 + 10 * (pluie > 0) + 6 * np.cos((doy - 15) / 365 * 2 * np.pi)
                            - (8 if z.regime == "mediterraneen" else 0) + rng.normal(0, 6, len(dates)), 25, 100)
         rows.append(pd.DataFrame({
-            "date": dates, "zone": z.zone, "latitude": z.latitude, "longitude": z.longitude,
+            "date": dates, "zone": z.zone,
             "temperature": temperature.round(1), "precipitation": pluie.round(1), "humidite": humidite.round(0),
         }))
     climat = pd.concat(rows, ignore_index=True)
 
-    # Evénements : logit de la probabilité d'inondation
-    df = climat.merge(ZONES.drop(columns="regime"), on=["zone", "latitude", "longitude"])
-    pluie_3j = df.groupby("zone")["precipitation"].transform(lambda s: s.rolling(3, min_periods=1).sum())
-    logit = -5.3 + 0.055 * pluie_3j - 0.004 * df["altitude"] + 0.5 * (df["type_zone"] == "urbain")
+
+    # Sites : quelques quartiers par commune, avec leurs caractéristiques géographiques
+    sites = []
+    for _, z in ZONES.iterrows():
+        for k in range(1, SITES_PAR_COMMUNE + 1):
+            distance = float(np.clip(rng.lognormal(np.log(700), 0.9), 30, 6000))
+            inondable = int(distance < 300 or (distance < 900 and rng.random() < 0.35))
+            sites.append({
+                "site": f"{z.zone}-{k:02d}",
+                "zone": z.zone,
+                "latitude": round(z.latitude + rng.uniform(-0.035, 0.035), 4),
+                "longitude": round(z.longitude + rng.uniform(-0.05, 0.05), 4),
+                "altitude": int(max(1, z.altitude + rng.normal(0, 12) + distance / 120)),
+                "distance_cours_eau_m": int(round(distance, -1)),
+                "zone_inondable": inondable,
+                "type_zone": z.type_zone,
+            })
+    geographie = pd.DataFrame(sites)
+
+    # Portefeuille par site : biens de la commune répartis entre ses quartiers
+    parts = []
+    for _, z in ZONES.iterrows():
+        poids = rng.dirichlet(np.full(SITES_PAR_COMMUNE, 4.0))
+        for k, w in enumerate(poids, 1):
+            parts.append({
+                "site": f"{z.zone}-{k:02d}",
+                "nb_biens": int(max(20, round(z.nb_biens * w))),
+                "valeur_assuree_moyenne": int(round(z.valeur_assuree_moyenne * rng.lognormal(0, 0.15), -3)),
+            })
+    exposition = pd.DataFrame(parts)
+
+    # Evénements par site et par jour : la pluie de la commune, modulée par la géographie du site
+    df = climat.merge(geographie, on="zone").merge(exposition, on="site")
+    df = df.sort_values(["site", "date"])
+    pluie_3j = df.groupby("site")["precipitation"].transform(lambda s: s.rolling(3, min_periods=1).sum())
+    logit = (-6.4 + 0.055 * pluie_3j - 0.004 * df["altitude"] + 1.1 * df["zone_inondable"]
+             - 0.45 * np.log(df["distance_cours_eau_m"] / 700) + 0.4 * (df["type_zone"] == "urbain"))
     proba = 1 / (1 + np.exp(-logit))
     inondation = (rng.random(len(df)) < proba).astype(int)
     taux_dommage = rng.lognormal(mean=-3.6, sigma=0.9, size=len(df))
-    biens_touches = rng.poisson(0.004 * df["nb_biens"]) + 1
+    biens_touches = rng.poisson(0.01 * df["nb_biens"] * (1 + df["zone_inondable"])) + 1
     cout = np.where(inondation == 1, (biens_touches * df["valeur_assuree_moyenne"] * taux_dommage).round(0), 0)
-    evenements = pd.DataFrame({"date": df["date"], "zone": df["zone"], "inondation": inondation, "cout_sinistre": cout})
+    evenements = pd.DataFrame({"date": df["date"].values, "site": df["site"].values,
+                               "inondation": inondation, "cout_sinistre": cout})
 
     climat.to_csv(OUT / "climat.csv", index=False)
-    ZONES.drop(columns=["latitude", "longitude", "regime"]).to_csv(OUT / "exposition.csv", index=False)
+    geographie.to_csv(OUT / "geographie.csv", index=False)
+    exposition.to_csv(OUT / "exposition.csv", index=False)
     evenements.to_csv(OUT / "evenements.csv", index=False)
-    print(f"climat : {len(climat)} lignes | exposition : {len(ZONES)} zones | "
-          f"inondations : {evenements.inondation.sum()} ({evenements.inondation.mean():.2%} des jours), "
+    print(f"climat : {len(climat)} lignes | sites : {len(geographie)} "
+          f"({geographie.zone_inondable.sum()} en zone inondable) | "
+          f"inondations : {evenements.inondation.sum()} ({evenements.inondation.mean():.2%} des jours-sites), "
           f"coût moyen par sinistre : {evenements.loc[evenements.inondation == 1, 'cout_sinistre'].mean():,.0f} EUR")
 
 

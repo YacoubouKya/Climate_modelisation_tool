@@ -15,13 +15,14 @@ from __future__ import annotations
 from pathlib import Path
 
 import altair as alt
+import numpy as np
 import pandas as pd
 import streamlit as st
 
 from climatool import data_loader, evaluation, maps, model_comparison, preprocessing, pricing, reporting, tuning
 from climatool.data_utils import merge_dataframes
 
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.4.0"
 CSS_FILE = Path(__file__).parent / "climatool" / "assets" / "style.css"
 
 
@@ -1120,8 +1121,17 @@ def page_pricing() -> None:
         mime="text/csv",
         on_click="ignore",
     )
+    # Coordonnées moyennes de chaque segment, pour afficher la tarification sur la carte
+    map_table = None
+    lat_c, lon_c = maps.detect_lat_lon_columns(df)
+    if segment_col and lat_c in df.columns and lon_c in df.columns:
+        coords = df.groupby(segment_col)[[lat_c, lon_c]].mean().rename(
+            columns={lat_c: "latitude", lon_c: "longitude"})
+        coords.index = coords.index.astype(str)
+        map_table = table.join(coords).reset_index()
     st.session_state["clim_pricing"] = {
         "table": table,
+        "map_table": map_table,
         "totals": totals,
         "loadings": {"securite": security, "frais": fees, "marge": margin},
         "segment_col": segment_col,
@@ -1129,53 +1139,84 @@ def page_pricing() -> None:
     }
 
 
-def page_maps() -> None:
-    # Fusionner toutes les sources de données disponibles
+def _prediction_map_data() -> pd.DataFrame | None:
+    """Probabilité d'événement prédite par le modèle, pour chaque ligne d'une source qui
+    contient ses variables et des coordonnées. Mise en cache par modèle et par source."""
+    info = st.session_state.get("clim_model_info") or {}
+    model = st.session_state.get("clim_model")
+    features = info.get("feature_cols") or []
+    if model is None or info.get("task_type") != "classification" or not hasattr(model, "predict_proba") or not features:
+        return None
+    candidates = []
     df_prep = st.session_state.get("clim_data_prep")
-    data_sources = st.session_state.get("data_sources", {})
-
-    # Priorité : données prétraitées, sinon fusion des sources
     if isinstance(df_prep, pd.DataFrame) and not df_prep.empty:
-        df = df_prep
-    elif data_sources:
-        # Fusionner toutes les sources sur une colonne commune si possible
-        dfs = list(data_sources.values())
-        if len(dfs) == 1:
-            df = dfs[0]
-        else:
-            # Essayer de fusionner sur colonnes communes (lat/lon ou date)
-            df = dfs[0].copy()
-            for i, other_df in enumerate(dfs[1:], 1):
-                # Détection de colonnes communes
-                common_cols = list(set(df.columns) & set(other_df.columns))
-                if common_cols:
-                    # Fusionner sur colonnes communes
-                    df = pd.merge(df, other_df, on=common_cols, how="outer", suffixes=("", f"_dup{i}"))
-                    # Supprimer les colonnes dupliquées
-                    dup_cols = [c for c in df.columns if f"_dup{i}" in c]
-                    if dup_cols:
-                        df = df.drop(columns=dup_cols)
-                else:
-                    # Concaténer si pas de colonnes communes
-                    st.info("Fusion par concaténation (pas de colonnes communes détectées)")
-                    other_df_renamed = other_df.copy()
-                    for col in other_df.columns:
-                        if col in df.columns:
-                            other_df_renamed = other_df_renamed.rename(columns={col: f"{col}_src{i+1}"})
-                    df = pd.concat([df, other_df_renamed], axis=1)
-    else:
-        df = st.session_state.get("clim_data")
+        candidates.append(df_prep)
+    data_sources = st.session_state.get("data_sources", {}) or {}
+    if len(data_sources) > 1:
+        candidates.append(_merged_sources())
+    candidates += list(data_sources.values())
+    for base in candidates:
+        if not isinstance(base, pd.DataFrame) or not set(features) <= set(base.columns):
+            continue
+        lat_c, lon_c = maps.detect_lat_lon_columns(base)
+        if lat_c not in base.columns or lon_c not in base.columns:
+            continue
+        key = (id(model), id(base), len(base))
+        cached = st.session_state.get("clim_map_predictions")
+        if cached and cached[0] == key:
+            return cached[1]
+        try:
+            proba = model.predict_proba(base[features])[:, 1]
+        except Exception:
+            continue
+        target = info.get("target_col")
+        keep = [c for c in base.columns if c in (lat_c, lon_c) or c in ("site", "zone", "date")
+                or pd.api.types.is_datetime64_any_dtype(base[c])]
+        out = base[keep].rename(columns={lat_c: "latitude", lon_c: "longitude"}).copy()
+        if target in base.columns and _is_binary(base[target]):
+            observed = base[target].astype(float)
+            # Même recalage que la tarification : la fréquence prédite moyenne égale l'observée
+            if proba.mean() > 0:
+                proba = np.clip(proba * observed.mean() / proba.mean(), 0, 1)
+            out["frequence_annuelle_observee"] = observed.values * 365.25
+        out["probabilite_predite_jour"] = proba
+        out["frequence_annuelle_predite"] = proba * 365.25
+        st.session_state["clim_map_predictions"] = (key, out)
+        return out
+    return None
 
-    if not isinstance(df, pd.DataFrame) or df.empty:
+
+def page_maps() -> None:
+    st.header("Cartographie du risque")
+    extra: dict[str, pd.DataFrame] = {}
+
+    pricing_state = st.session_state.get("clim_pricing") or {}
+    map_table = pricing_state.get("map_table")
+    if isinstance(map_table, pd.DataFrame) and not map_table.empty:
+        extra["Tarification par segment"] = map_table
+
+    predictions = _prediction_map_data()
+    if isinstance(predictions, pd.DataFrame) and not predictions.empty:
+        extra["Prédictions du modèle"] = predictions
+
+    data_sources = st.session_state.get("data_sources", {}) or {}
+    if len(data_sources) > 1:
+        merged = _merged_sources()
+        if isinstance(merged, pd.DataFrame):
+            extra["Fusion des sources"] = merged
+
+    df_prep = st.session_state.get("clim_data_prep")
+    if not extra and not data_sources and not isinstance(df_prep, pd.DataFrame):
         st.warning("Veuillez d'abord charger des données.")
         return
-
-    # Récupérer les sources de données et les données prétraitées
-    data_sources = st.session_state.get("data_sources", {})
-    df_prep = st.session_state.get("clim_data_prep")
-
-    # Ne pas afficher de titre ici car run_maps_page le fait déjà
-    maps.run_maps_page(df, title="", data_sources=data_sources, df_prep=df_prep)
+    if "Tarification par segment" in extra or "Prédictions du modèle" in extra:
+        st.caption(
+            "Prédictions du modèle : fréquence annuelle d'inondation attendue par lieu (probabilité "
+            "quotidienne x 365), recalée sur la fréquence observée et comparable à la fréquence "
+            "annuelle observée. Tarification par segment : prime et charge attendue de chaque segment, "
+            "placé au centre de ses sites."
+        )
+    maps.run_maps_page(None, title="", data_sources=data_sources, df_prep=df_prep, extra_sources=extra)
 
 
 def page_reporting() -> None:
