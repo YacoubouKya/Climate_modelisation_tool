@@ -12,26 +12,23 @@ Flux fonctionnel :
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import altair as alt
 import pandas as pd
 import streamlit as st
-import altair as alt
-import numpy as np
+from sklearn.ensemble import (
+    GradientBoostingClassifier,
+    GradientBoostingRegressor,
+    RandomForestClassifier,
+    RandomForestRegressor,
+)
 
-# Imports des modules avec gestion d'erreur
-try:
-    import clim_data_loader
-    import clim_preprocessing
-    import clim_modeling
-    import clim_evaluation
-    import clim_visualization
-    import clim_geospatial
-    import clim_reporting_new  # Import du nouveau module de reporting
-    import clim_maps
-    import clim_model_comparison
-    from clim_data_utils import merge_dataframes
-except ImportError as e:
-    st.error(f"❌ Erreur d'import des modules : {e}")
-    st.stop()
+from climatool import data_loader, evaluation, maps, model_comparison, preprocessing, reporting
+from climatool.data_utils import merge_dataframes
+
+APP_VERSION = "1.1.0"
+CSS_FILE = Path(__file__).parent / "climatool" / "assets" / "style.css"
 
 
 st.set_page_config(
@@ -40,167 +37,14 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Optimisations de performance
-if 'initialized' not in st.session_state:
-    st.session_state['initialized'] = True
-
-
-@st.cache_resource
 def _inject_custom_css() -> None:
-    """Applique le même thème que l'app principale Data Project Tool."""
-
-    st.markdown(
-        """
-        <style>
-
-        /********* HEADER *********/
-        .custom-header {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 60px;
-            background-color: #1E3A5F;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 40px;
-            z-index: 9999;
-            box-shadow: 0px 2px 5px rgba(0,0,0,0.3);
-        }
-        .custom-header .logo { font-size: 22px; font-weight: bold; color: #FFD700; }
-        .custom-header .menu { display: flex; gap: 20px; }
-        .custom-header .menu a { color: white; text-decoration: none; font-weight: 500; font-family: 'Segoe UI', sans-serif; transition: color 0.3s; }
-        .custom-header .menu a:hover { color: #FFD700; }
-
-        .block-container { padding-top: 80px !important; }
-        .stApp { background-color: #1E3A5F; }
-        .block-container, .st-emotion-cache-18e3th9, .st-emotion-cache-1y4p8pa { background-color: transparent !important; }
-
-        /********* TITRES *********/
-        h1, h2, h3, h4 { color: #FFD700; font-family: 'Segoe UI', sans-serif; }
-
-        /********* TEXTE GLOBAL *********/
-        .block-container p,
-        .block-container span,
-        .block-container label,
-        .block-container div:not([data-testid="stFileUploader"]):not(.stSelectbox):not([role="radiogroup"]) {
-            color: #FFFFFF !important;
-            font-family: 'Segoe UI', sans-serif;
-        }
-
-        /********* SIDEBAR *********/
-        [data-testid="stSidebar"] { background-color: #1569C7 !important; color: yellow !important; }
-        [data-testid="stSidebar"] h1, h2, h3, label { color: yellow !important; }
-
-        /********* BOUTONS *********/
-        .stButton>button { background-color: #FFD700; color: #1E3A5F; border-radius: 10px; padding: 10px 20px; border: none; font-weight: bold; }
-        .stButton>button:hover { background-color: #FFA500; color: white; }
-
-        /********* FILE UPLOADER *********/
-        [data-testid="stFileUploader"] {
-            background-color: #FFD700 !important;
-            border-radius: 10px;
-            padding: 10px;
-        }
-
-        [data-testid="stFileUploader"] * {
-            color: #FFFFFF !important;
-            font-weight: 600;
-        }
-
-        [data-testid="stFileUploaderDropzone"] {
-            background-color: #111827 !important;
-            border: 2px dashed #FFD700 !important;
-        }
-
-        /********* RADIO + SELECTBOX *********/
-        div[role="radiogroup"] label {
-            background: #34495E !important;
-            color: yellow !important;
-            padding: 8px 15px;
-            border-radius: 8px;
-            margin: 3px 0;
-            cursor: pointer;
-        }
-
-        div[role="radiogroup"] label:hover {
-            background: #1ABC9C !important;
-        }
-
-        .stSelectbox * {
-            background-color: #34495E !important;
-            color: yellow !important;
-        }
-
-        /********* JSON & CODE *********/
-        [data-testid="stJson"] {
-            background-color: #000000 !important;
-            border-radius: 8px;
-            padding: 10px;
-        }
-
-        [data-testid="stJson"] *,
-        [data-testid="stJson"] div,
-        [data-testid="stJson"] span,
-        [data-testid="stJson"] p {
-            background-color: #000000 !important;
-            color: #FFFFFF !important;
-            font-family: 'Courier New', monospace !important;
-        }
-
-        code, pre {
-            background-color: #000000 !important;
-            color: #FFFFFF !important;
-            border-radius: 5px;
-            padding: 10px !important;
-        }
-
-        /********* DATAFRAMES *********/
-        [data-testid="stDataFrame"] {
-            background-color: #000000 !important;
-        }
-
-        [data-testid="stDataFrame"] * {
-            color: #FFFFFF !important;
-        }
-
-        .stDataFrame table {
-            background-color: #000000 !important;
-            color: #FFFFFF !important;
-        }
-
-        .stDataFrame th {
-            background-color: #1E3A5F !important;
-            color: #FFD700 !important;
-            font-weight: bold;
-        }
-
-        .stDataFrame td {
-            background-color: #000000 !important;
-            color: #FFFFFF !important;
-        }
-
-        /********* EXPANDERS *********/
-        [data-testid="stExpander"] {
-            background-color: #1E3A5F !important;
-            border: 1px solid #FFD700 !important;
-        }
-
-        [data-testid="stExpander"] * {
-            color: #FFFFFF !important;
-        }
-
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    """Applique le thème visuel commun avec Data Project Tool."""
+    st.markdown(f"<style>{CSS_FILE.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
 
 
 def main() -> None:
     _inject_custom_css()
-    
+
     # Initialisation des clés de session_state si elles n'existent pas
     if 'initialized' not in st.session_state:
         st.session_state.update({
@@ -212,64 +56,37 @@ def main() -> None:
             'project_framing': {},
             'data_sources': {}
         })
-    
-    # Header HTML fixé en haut, comme pour l'app principale
+
     st.markdown(
-        """
-        <div class="custom-header">
-            <div class="logo">🌍 Data Tool Climatique</div>
-            <div class="menu">
-                <a href="#">About</a>
-                <a href="#">Documentation</a>
-                <a href="#">Hackathon</a>
-            </div>
-        </div>
-        """,
+        '<div class="custom-header"><div class="logo">Data Tool Climatique</div></div>',
         unsafe_allow_html=True,
     )
 
-    st.title(" Data Tool Climatique")
-    st.markdown("Bienvenue dans ton outil de risque climatique interactif ")
+    st.caption(f"Développé par Yacoubou KOUMAI - v{APP_VERSION}")
+    st.title("Data Tool Climatique")
+    st.markdown("Analyse et modélisation du risque climatique, du cadrage au rapport final.")
 
-    st.sidebar.title(" Navigation")
-    section = st.sidebar.radio(
-        "Aller à :",
-        [
-            " Cadrage du Projet",
-            " Chargement",
-            " EDA Climatique",
-            " Prétraitement Climat",
-            " Modélisation du Risque",
-            " Évaluation & Scénarios",
-            " Cartographie du Risque",
-            " Reporting",
-        ],
-    )
-
-    if section == " Cadrage du Projet":
-        page_framing()
-    elif section == " Chargement":
-        page_loading()
-    elif section == " EDA Climatique":
-        page_eda()
-    elif section == " Prétraitement Climat":
-        page_preprocessing()
-    elif section == " Modélisation du Risque":
-        page_modeling()
-    elif section == " Évaluation & Scénarios":
-        page_evaluation()
-    elif section == " Cartographie du Risque":
-        page_maps()
-    else:
-        page_reporting()
+    pages = {
+        "Cadrage du Projet": page_framing,
+        "Chargement": page_loading,
+        "EDA Climatique": page_eda,
+        "Prétraitement Climat": page_preprocessing,
+        "Modélisation du Risque": page_modeling,
+        "Évaluation & Scénarios": page_evaluation,
+        "Cartographie du Risque": page_maps,
+        "Reporting": page_reporting,
+    }
+    st.sidebar.title("Navigation")
+    section = st.sidebar.radio("Aller à :", list(pages))
+    pages[section]()
 
 
 def page_framing() -> None:
     """Page de cadrage du projet climat : objectif, unité d'analyse, cible."""
 
-    st.header(" Cadrage du Projet Climat")
+    st.header("Cadrage du Projet Climat")
     st.markdown(
-        """Définissez clairement l'objectif métier et le périmètre de votre analyse 
+        """Définissez clairement l'objectif métier et le périmètre de votre analyse
         avant de charger et traiter les données. Ces informations seront reprises dans le rapport final."""
     )
 
@@ -308,7 +125,7 @@ def page_framing() -> None:
         placeholder="Ex: Hackathon 48h, mission client, étude académique",
     )
 
-    if st.button(" Enregistrer le cadrage"):
+    if st.button("Enregistrer le cadrage"):
         st.session_state["project_framing"] = {
             "objective_type": objective_type,
             "objective_desc": objective_desc,
@@ -316,12 +133,12 @@ def page_framing() -> None:
             "target_desc": target_desc,
             "context": context,
         }
-        st.success("✅ Cadrage enregistré ! Vous pouvez maintenant charger vos données.")
+        st.success("Cadrage enregistré ! Vous pouvez maintenant charger vos données.")
 
     # Afficher le cadrage actuel si déjà enregistré
     if "project_framing" in st.session_state:
         st.markdown("---")
-        st.subheader("📋 Cadrage actuel")
+        st.subheader("Cadrage actuel")
         framing = st.session_state["project_framing"]
         st.markdown(f"**Type d'objectif :** {framing['objective_type']}")
         if framing["objective_desc"]:
@@ -339,10 +156,10 @@ def _select_data_source() -> pd.DataFrame:
     try:
         data_sources = st.session_state.get("data_sources", {})
         df_prep = st.session_state.get("clim_data_prep")
-        
+
         # Options disponibles - Ordre : Climat d'abord, Fusion en dernier
         options = []
-        
+
         # 1. Ajouter les sources individuelles (Climat en priorité)
         if data_sources:
             # Priorité à "Climat" s'il existe
@@ -352,21 +169,21 @@ def _select_data_source() -> pd.DataFrame:
             for label in data_sources.keys():
                 if label != "Climat":
                     options.append(f"Source : {label}")
-        
+
         # 2. Ajouter l'option de fusion (avant les données prétraitées)
         if data_sources and len(data_sources) > 1:
             options.append("Fusionner toutes les sources")
-        
+
         # 3. Ajouter les données prétraitées en dernier
         if isinstance(df_prep, pd.DataFrame) and not df_prep.empty:
             options.append("Données prétraitées (fusionnées)")
-        
+
         if not options:
             return None
     except Exception as e:
-        st.error(f"❌ Erreur lors de la sélection de la source : {e}")
+        st.error(f"Erreur lors de la sélection de la source : {e}")
         return None
-    
+
     # Si une seule option, la retourner directement sans UI
     if len(options) == 1:
         if "prétraitées" in options[0]:
@@ -377,16 +194,16 @@ def _select_data_source() -> pd.DataFrame:
                 try:
                     st.session_state["merged_data"] = merge_dataframes(list(data_sources.values()))
                 except (ValueError, TypeError) as e:
-                    st.error(f"❌ Erreur lors de la fusion des données : {e}")
+                    st.error(f"Erreur lors de la fusion des données : {e}")
                     return None
             return st.session_state["merged_data"]
         else:
             source_label = options[0].replace("Source : ", "")
             return data_sources[source_label]
-    
+
     # Sinon, proposer un selectbox
-    choice = st.selectbox("📂 Choisir la source de données", options, key="data_source_selector")
-    
+    choice = st.selectbox("Choisir la source de données", options, key="data_source_selector")
+
     if "prétraitées" in choice:
         return df_prep
     elif "Fusionner" in choice:
@@ -395,7 +212,7 @@ def _select_data_source() -> pd.DataFrame:
             try:
                 st.session_state["merged_data"] = merge_dataframes(list(data_sources.values()))
             except (ValueError, TypeError) as e:
-                st.error(f"❌ Erreur lors de la fusion des données : {e}")
+                st.error(f"Erreur lors de la fusion des données : {e}")
                 return None
         return st.session_state["merged_data"]
     else:
@@ -404,9 +221,9 @@ def _select_data_source() -> pd.DataFrame:
 
 
 def page_loading() -> None:
-    st.header("📥 Chargement des données (multi-sources)")
+    st.header("Chargement des données (multi-sources)")
     st.markdown(
-        """Chargez plusieurs fichiers (climat, géographie, exposition, événements) 
+        """Chargez plusieurs fichiers (climat, géographie, exposition, événements)
         et labelisez-les pour les fusionner plus tard dans le prétraitement."""
     )
 
@@ -414,7 +231,7 @@ def page_loading() -> None:
     if "data_sources" not in st.session_state:
         st.session_state["data_sources"] = {}
 
-    st.subheader("📂 Ajouter une source de données")
+    st.subheader("Ajouter une source de données")
 
     col1, col2 = st.columns([1, 2])
     with col1:
@@ -442,11 +259,12 @@ def page_loading() -> None:
             xls = pd.ExcelFile(uploaded)
             sheet = st.selectbox("Feuille Excel", xls.sheet_names)
 
-        if st.button("➕ Ajouter cette source"):
-            df = clim_data_loader.load_tabular_file(uploaded, sep=sep, sheet_name=sheet)
+        if st.button("Ajouter cette source"):
+            df = data_loader.load_tabular_file(uploaded, sep=sep, sheet_name=sheet)
             if df is not None:
                 st.session_state["data_sources"][source_label] = df
-                st.success(f"✅ Source '{source_label}' ajoutée avec succès ({df.shape[0]} lignes × {df.shape[1]} colonnes).")
+                st.session_state.pop("merged_data", None)  # la fusion doit être recalculée
+                st.success(f"Source '{source_label}' ajoutée avec succès ({df.shape[0]} lignes × {df.shape[1]} colonnes).")
                 # Compatibilité : si première source ou source "Climat", la mettre aussi dans clim_data
                 if len(st.session_state["data_sources"]) == 1 or source_label == "Climat":
                     st.session_state["clim_data"] = df
@@ -454,15 +272,16 @@ def page_loading() -> None:
     # Afficher les sources chargées
     if st.session_state["data_sources"]:
         st.markdown("---")
-        st.subheader(" Sources chargées")
+        st.subheader("Sources chargées")
         for idx, (label, df) in enumerate(st.session_state["data_sources"].items()):
-            st.markdown(f"** {label}** : {df.shape[0]} lignes × {df.shape[1]} colonnes")
+            st.markdown(f"**{label}** : {df.shape[0]} lignes × {df.shape[1]} colonnes")
             col1, col2 = st.columns([4, 1])
             with col1:
-                st.dataframe(df.head(), use_container_width=True)
+                st.dataframe(df.head(), width="stretch")
             with col2:
-                if st.button(f"🗑️ Supprimer", key=f"del_source_{idx}"):
+                if st.button("Supprimer", key=f"del_source_{idx}"):
                     del st.session_state["data_sources"][label]
+                    st.session_state.pop("merged_data", None)
                     if label == "Climat" and "clim_data" in st.session_state:
                         del st.session_state["clim_data"]
                     st.rerun()
@@ -470,18 +289,18 @@ def page_loading() -> None:
 
 
 def page_eda() -> None:
-    st.header("🔎 EDA Climatique")
-    
+    st.header("EDA Climatique")
+
     # Sélection de la source
     df = _select_data_source()
     if df is None:
-        st.warning("Veuillez d'abord charger des données dans l'onglet 📥 Chargement.")
+        st.warning("Veuillez d'abord charger des données dans l'onglet Chargement.")
         return
 
     st.subheader("Aperçu général")
-    st.write(f"Shape : {df.shape[0]:,} lignes × {df.shape[1]} colonnes")
+    st.write(f"Dimensions : {df.shape[0]:,} lignes × {df.shape[1]} colonnes")
     # Limiter à 10 lignes pour meilleures performances
-    st.dataframe(df.head(10), use_container_width=True, height=300)
+    st.dataframe(df.head(10), width="stretch", height=300)
 
     st.subheader("Série temporelle simple")
     date_col = st.selectbox("Colonne date", options=["(aucune)"] + df.columns.tolist())
@@ -505,8 +324,8 @@ def page_eda() -> None:
                 .mark_line(color="#FFD700", strokeWidth=2)
                 .encode(
                     x=alt.X(
-                        date_col, 
-                        type="temporal", 
+                        date_col,
+                        type="temporal",
                         title=date_col,
                         axis=alt.Axis(
                             labelAngle=-45,
@@ -522,24 +341,24 @@ def page_eda() -> None:
                 .configure_axis(grid=True, gridOpacity=0.3)  # Grille légère pour meilleur rendu
             )
 
-            st.altair_chart(chart, use_container_width=True)
+            st.altair_chart(chart, width="stretch")
         except Exception as exc:  # pragma: no cover - affichage utilisateur
             st.error(f"Impossible de tracer la série temporelle : {exc}")
 
 
 def page_preprocessing() -> None:
     """Page de prétraitement épurée et simplifiée"""
-    st.header("🔧 Prétraitement Climat")
-    
+    st.header("Prétraitement Climat")
+
     # Sélection de la source
     df = _select_data_source()
     if df is None:
-        st.warning("Veuillez d'abord charger des données dans l'onglet 📥 Chargement.")
+        st.warning("Veuillez d'abord charger des données dans l'onglet Chargement.")
         return
 
     # Paramètres de prétraitement
-    st.subheader("📋 Paramètres de prétraitement")
-    
+    st.subheader("Paramètres de prétraitement")
+
     col1, col2 = st.columns(2)
     with col1:
         date_col = st.selectbox("Colonne date", options=["(aucune)"] + df.columns.tolist())
@@ -555,7 +374,7 @@ def page_preprocessing() -> None:
     num_cols = df.select_dtypes(include=["number"]).columns.tolist()
 
     # Features temporelles
-    st.markdown("### 📊 Features temporelles")
+    st.markdown("### Features temporelles")
     use_rolling = st.checkbox("Ajouter des moyennes glissantes", value=False)
     rolling_cols = st.multiselect("Colonnes pour moyennes glissantes", options=num_cols) if use_rolling else []
 
@@ -564,11 +383,11 @@ def page_preprocessing() -> None:
 
     # Bouton de traitement
     st.markdown("---")
-    if st.button("▶️ Appliquer le prétraitement", type="primary", use_container_width=True):
+    if st.button("▶Appliquer le prétraitement", type="primary", width="stretch"):
         with st.spinner("Prétraitement en cours..."):
             try:
                 dcol = None if date_col == "(aucune)" else date_col
-                df_prep, info = clim_preprocessing.basic_climate_preprocessing(
+                df_prep, info = preprocessing.basic_climate_preprocessing(
                     df,
                     date_col=dcol,
                     freq=freq,
@@ -578,15 +397,15 @@ def page_preprocessing() -> None:
                     detect_anomalies=use_anomaly,
                     anomaly_cols=anomaly_cols,
                 )
-                
+
                 # Sauvegarde dans session_state
                 st.session_state["clim_data_prep"] = df_prep
                 st.session_state["clim_prep_info"] = info
 
                 # Affichage des résultats
-                st.success("✅ Prétraitement terminé avec succès!")
-                st.subheader("📊 Résultats du prétraitement")
-                
+                st.success("Prétraitement terminé avec succès!")
+                st.subheader("Résultats du prétraitement")
+
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     st.metric("Lignes", f"{df_prep.shape[0]:,}")
@@ -594,13 +413,13 @@ def page_preprocessing() -> None:
                     st.metric("Colonnes", df_prep.shape[1])
                 with col3:
                     st.metric("Nouvelles features", df_prep.shape[1] - df.shape[1])
-                
-                st.subheader("🔍 Aperçu des données prétraitées")
-                st.dataframe(df_prep.head(), use_container_width=True)
-                
+
+                st.subheader("Aperçu des données prétraitées")
+                st.dataframe(df_prep.head(), width="stretch")
+
                 # Afficher le résumé des anomalies si disponible
                 if info.get("anomaly_summary"):
-                    st.subheader("⚠️ Résumé des anomalies détectées")
+                    st.subheader("Résumé des anomalies détectées")
                     summary = info["anomaly_summary"]
                     rows = [
                         {
@@ -611,34 +430,34 @@ def page_preprocessing() -> None:
                         for col, vals in summary.items()
                     ]
                     if rows:
-                        st.dataframe(pd.DataFrame(rows), use_container_width=True)
-                
+                        st.dataframe(pd.DataFrame(rows), width="stretch")
+
             except Exception as e:
-                st.error(f"❌ Erreur lors du prétraitement : {str(e)}")
+                st.error(f"Erreur lors du prétraitement : {str(e)}")
                 st.exception(e)
 
 
 def page_modeling() -> None:
-    st.header(" Modélisation du Risque Climatique")
-    
+    st.header("Modélisation du Risque Climatique")
+
     # Sélection de la source de données
     df = _select_data_source()
     if df is None or df.empty:
-        st.warning("Veuillez d'abord charger des données dans l'onglet 📥 Chargement.")
+        st.warning("Veuillez d'abord charger des données dans l'onglet Chargement.")
         return
 
     # Configuration de base
-    st.subheader(" Configuration")
+    st.subheader("Configuration")
     col1, col2 = st.columns(2)
-    
+
     with col1:
         target_col = st.selectbox("Colonne cible (risque)", options=df.columns.tolist())
         test_size = st.slider("Taille du jeu de test", min_value=0.1, max_value=0.5, value=0.2, step=0.05)
-    
+
     with col2:
         # Détecter automatiquement le type de tâche
         y = df[target_col]
-        detected_task = clim_model_comparison.detect_task_type(y)
+        detected_task = model_comparison.detect_task_type(y)
         task_type = st.selectbox(
             "Type de tâche",
             options=["auto", "classification", "regression"],
@@ -646,11 +465,11 @@ def page_modeling() -> None:
             help=f"Détection automatique : {detected_task}"
         )
         if task_type == "auto":
-            st.info(f"✓ Tâche détectée : **{detected_task}**")
+            st.info(f"Tâche détectée : **{detected_task}**")
 
     # Choix du mode
     st.markdown("---")
-    st.subheader("🔧 Mode de modélisation")
+    st.subheader("Mode de modélisation")
     modeling_mode = st.radio(
         "Choisissez votre approche",
         ["Modèle unique", "Comparaison de modèles", "Affiner le meilleur modèle"],
@@ -659,9 +478,9 @@ def page_modeling() -> None:
 
     # Options communes
     st.markdown("---")
-    st.subheader(" Options avancées")
+    st.subheader("Options avancées")
     col1, col2, col3 = st.columns(3)
-    
+
     with col1:
         handle_imbalance = st.checkbox("Gérer le déséquilibre", value=False)
     with col2:
@@ -672,17 +491,17 @@ def page_modeling() -> None:
     # MODE 1 : Modèle unique
     if modeling_mode == "Modèle unique":
         st.markdown("---")
-        st.subheader(" Modèle unique")
-        
+        st.subheader("Modèle unique")
+
         model_name = st.selectbox(
             "Type de modèle",
             options=["Random Forest", "Gradient Boosting", "Logistic Regression", "Linear Regression", "Decision Tree"],
             index=0,
         )
 
-        if st.button(" Entraîner le modèle"):
+        if st.button("Entraîner le modèle"):
             with st.spinner("Entraînement en cours..."):
-                results, final_task = clim_model_comparison.compare_models(
+                results, final_task = model_comparison.compare_models(
                     df,
                     target_col=target_col,
                     task=task_type,
@@ -692,7 +511,7 @@ def page_modeling() -> None:
                     use_cv=use_cv,
                     handle_imbalance=handle_imbalance,
                 )
-                
+
                 if results and results[0]["success"]:
                     result = results[0]
                     st.session_state["clim_model"] = result["pipeline"]
@@ -722,8 +541,8 @@ def page_modeling() -> None:
                         "feature_importance": result.get("feature_importance"),
                         "feature_names": result.get("feature_names"),
                     }
-                    
-                    st.success(f"✅ Modèle entraîné : {result['model_name']}")
+
+                    st.success(f"Modèle entraîné : {result['model_name']}")
                     col1, col2, col3 = st.columns(3)
                     with col1:
                         st.metric("Score Test", f"{result['test_score']:.4f}")
@@ -735,26 +554,26 @@ def page_modeling() -> None:
     # MODE 2 : Comparaison de modèles
     elif modeling_mode == "Comparaison de modèles":
         st.markdown("---")
-        st.subheader(" Comparaison de modèles")
-        
+        st.subheader("Comparaison de modèles")
+
         # Obtenir les modèles disponibles
-        available_models = list(clim_model_comparison.get_available_models(
-            detected_task if task_type == "auto" else task_type, 
+        available_models = list(model_comparison.get_available_models(
+            detected_task if task_type == "auto" else task_type,
             fast_mode
         ).keys())
-        
+
         selected_models = st.multiselect(
             "Modèles à comparer",
             options=available_models,
             default=available_models[:5] if len(available_models) >= 5 else available_models
         )
 
-        if st.button(" Comparer les modèles"):
+        if st.button("Comparer les modèles"):
             if not selected_models:
                 st.warning("Veuillez sélectionner au moins un modèle.")
             else:
                 with st.spinner(f"Comparaison de {len(selected_models)} modèles..."):
-                    results, final_task = clim_model_comparison.compare_models(
+                    results, final_task = model_comparison.compare_models(
                         df,
                         target_col=target_col,
                         task=task_type,
@@ -764,10 +583,10 @@ def page_modeling() -> None:
                         use_cv=use_cv,
                         handle_imbalance=handle_imbalance,
                     )
-                    
+
                     # Afficher les résultats
-                    best_result = clim_model_comparison.display_comparison_results(results, final_task)
-                    
+                    best_result = model_comparison.display_comparison_results(results, final_task)
+
                     # Stocker le meilleur modèle
                     if best_result:
                         st.session_state["clim_model"] = best_result["pipeline"]
@@ -802,40 +621,40 @@ def page_modeling() -> None:
     # MODE 3 : Affiner le meilleur modèle
     elif modeling_mode == "Affiner le meilleur modèle":
         st.markdown("---")
-        st.subheader("🔬 Affinage du meilleur modèle")
-        
+        st.subheader("Affinage du meilleur modèle")
+
         if "clim_comparison_results" not in st.session_state:
-            st.warning("⚠️ Veuillez d'abord comparer des modèles pour identifier le meilleur.")
+            st.warning("Veuillez d'abord comparer des modèles pour identifier le meilleur.")
         else:
             results = st.session_state["clim_comparison_results"]
             successful_results = [r for r in results if r["success"]]
             best_result = successful_results[max(range(len(successful_results)), key=lambda i: successful_results[i]["test_score"])]
-            
+
             # Afficher le score de base avec contexte
             col1, col2, col3 = st.columns([2, 1, 1])
             with col1:
-                st.info(f" Modèle sélectionné : **{best_result['model_name']}**")
+                st.info(f"Modèle sélectionné : **{best_result['model_name']}**")
             with col2:
                 st.metric("Score de base", f"{best_result['test_score']:.4f}")
             with col3:
                 st.metric("Temps", f"{best_result['training_time']:.2f}s")
-            
-            st.success(f" Meilleur modèle de la comparaison (Score: {best_result['test_score']:.4f})")
-            st.info(" Les hyperparamètres du meilleur modèle sont pré-remplis. Vous pouvez les modifier pour optimiser davantage.")
-            
+
+            st.success(f"Meilleur modèle de la comparaison (Score: {best_result['test_score']:.4f})")
+            st.info("Les hyperparamètres du meilleur modèle sont pré-remplis. Vous pouvez les modifier pour optimiser davantage.")
+
             st.markdown("---")
             st.markdown("**Hyperparamètres à affiner**")
-            
+
             # Affinage selon le type de modèle
             if "Random Forest" in best_result["model_name"]:
                 # Extraire les hyperparamètres actuels du pipeline
                 current_model = best_result["pipeline"].named_steps.get("model")
-                
+
                 # Valeurs par défaut (pré-remplies depuis le meilleur modèle)
                 default_n_estimators = getattr(current_model, 'n_estimators', 100)
                 default_max_depth = getattr(current_model, 'max_depth', None) or 10
                 default_min_samples_split = getattr(current_model, 'min_samples_split', 2)
-                
+
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     n_estimators = st.slider("n_estimators", 50, 500, default_n_estimators, 50, key="tune_n_est")
@@ -843,105 +662,30 @@ def page_modeling() -> None:
                     max_depth = st.slider("max_depth", 3, 30, default_max_depth, 1, key="tune_max_depth")
                 with col3:
                     min_samples_split = st.slider("min_samples_split", 2, 20, default_min_samples_split, 1, key="tune_min_split")
-                
-                if st.button("🚀 Affiner le modèle"):
-                    with st.spinner("Réentraînement avec les nouveaux hyperparamètres..."):
-                        # Récupérer le type de tâche
-                        task_type = st.session_state.get("clim_model_info", {}).get("task_type", detected_task)
-                        
-                        # Créer le nouveau modèle avec les hyperparamètres affinés
-                        from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-                        
-                        if task_type == "classification":
-                            tuned_model = RandomForestClassifier(
-                                n_estimators=n_estimators,
-                                max_depth=max_depth,
-                                min_samples_split=min_samples_split,
-                                random_state=42,
-                                n_jobs=-1,
-                                class_weight="balanced" if handle_imbalance else None
-                            )
-                        else:
-                            tuned_model = RandomForestRegressor(
-                                n_estimators=n_estimators,
-                                max_depth=max_depth,
-                                min_samples_split=min_samples_split,
-                                random_state=42,
-                                n_jobs=-1
-                            )
-                        
-                        # Réentraîner
-                        tuned_results, _ = clim_model_comparison.compare_models(
-                            df,
-                            target_col=target_col,
-                            task=task_type,
-                            test_size=test_size,
-                            selected_models=["Random Forest (Tuned)"],
-                            fast_mode=False,
-                            use_cv=use_cv,
-                            handle_imbalance=handle_imbalance,
+
+                if st.button("Affiner le modèle"):
+                    task_type = st.session_state.get("clim_model_info", {}).get("task_type", detected_task)
+                    if task_type == "classification":
+                        tuned_model = RandomForestClassifier(
+                            n_estimators=n_estimators,
+                            max_depth=max_depth,
+                            min_samples_split=min_samples_split,
+                            random_state=42,
+                            n_jobs=-1,
+                            class_weight="balanced" if handle_imbalance else None
                         )
-                        
-                        # Remplacer le modèle par le modèle affiné
-                        if tuned_results and tuned_results[0]["success"]:
-                            tuned_result = tuned_results[0]
-                            
-                            # Comparer avec le modèle de base
-                            st.markdown("---")
-                            st.subheader("📊 Résultats de l'affinage")
-                            
-                            col1, col2, col3 = st.columns(3)
-                            with col1:
-                                st.metric(
-                                    "Score Test",
-                                    f"{tuned_result['test_score']:.4f}",
-                                    delta=f"{tuned_result['test_score'] - best_result['test_score']:.4f}"
-                                )
-                            with col2:
-                                st.metric(
-                                    "Score Train",
-                                    f"{tuned_result['train_score']:.4f}",
-                                    delta=f"{tuned_result['train_score'] - best_result['train_score']:.4f}"
-                                )
-                            with col3:
-                                st.metric("Temps", f"{tuned_result['training_time']:.2f}s")
-                            
-                            # Afficher un message selon l'amélioration
-                            improvement = tuned_result['test_score'] - best_result['test_score']
-                            if improvement > 0.01:
-                                st.success(f" Amélioration significative : +{improvement:.4f}")
-                            elif improvement > 0:
-                                st.info(f"✓ Légère amélioration : +{improvement:.4f}")
-                            else:
-                                st.warning(f"⚠️ Pas d'amélioration : {improvement:.4f}")
-                            
-                            # Sauvegarder le modèle affiné
-                            st.session_state["clim_model"] = tuned_result["pipeline"]
-                            st.session_state["clim_model_info"] = {
-                                "task_type": task_type,
-                                "model_name": f"{tuned_result['model_name']} (Affiné)",
-                                "metric_name": tuned_result["metric_name"],
-                                "metric_value": tuned_result["test_score"],
-                                "target_col": target_col,  # Ajout de la variable cible
-                                # Métriques de classification
-                                "f1_score": tuned_result.get("f1_score"),
-                                "precision": tuned_result.get("precision"),
-                                "recall": tuned_result.get("recall"),
-                                # Métriques de régression
-                                "mse": tuned_result.get("mse"),
-                                "rmse": tuned_result.get("rmse"),
-                                "mae": tuned_result.get("mae"),
-                                "r2": tuned_result.get("r2"),
-                                "cv_scores": tuned_result["cv_scores"],
-                                # Informations manquantes ajoutées
-                                "train_shape": tuned_result.get("train_shape"),
-                                "test_shape": tuned_result.get("test_shape"),
-                                "feature_importance": tuned_result.get("feature_importance"),
-                                "feature_names": tuned_result.get("feature_names"),
-                            }
-                            
-                            st.success("✅ Modèle affiné sauvegardé !")
-            
+                    else:
+                        tuned_model = RandomForestRegressor(
+                            n_estimators=n_estimators,
+                            max_depth=max_depth,
+                            min_samples_split=min_samples_split,
+                            random_state=42,
+                            n_jobs=-1
+                        )
+
+                    _train_tuned_model(df, target_col, task_type, test_size, use_cv,
+                                       handle_imbalance, best_result, "Random Forest", tuned_model)
+
             elif "Gradient Boosting" in best_result["model_name"]:
                 col1, col2, col3 = st.columns(3)
                 with col1:
@@ -950,37 +694,111 @@ def page_modeling() -> None:
                     learning_rate = st.slider("learning_rate", 0.01, 0.3, 0.1, 0.01, key="tune_gb_lr")
                 with col3:
                     max_depth = st.slider("max_depth", 3, 10, 3, 1, key="tune_gb_depth")
-                
-                if st.button("🚀 Affiner le modèle"):
-                    st.info("Affinage Gradient Boosting en cours...")
-                    # Logique similaire pour GB
-                    st.warning("Implémentation complète à venir pour Gradient Boosting")
-            
+
+                if st.button("Affiner le modèle"):
+                    task_type = st.session_state.get("clim_model_info", {}).get("task_type", detected_task)
+                    params = dict(n_estimators=n_estimators, learning_rate=learning_rate,
+                                  max_depth=max_depth, random_state=42)
+                    tuned_model = (GradientBoostingClassifier(**params) if task_type == "classification"
+                                   else GradientBoostingRegressor(**params))
+                    _train_tuned_model(df, target_col, task_type, test_size, use_cv,
+                                       handle_imbalance, best_result, "Gradient Boosting", tuned_model)
+
             else:
-                st.info(" L'affinage détaillé pour ce type de modèle sera ajouté prochainement.")
-                st.markdown("""
-                **Modèles supportés pour l'affinage :**
-                - ✅ Random Forest
-                - 🔄 Gradient Boosting (bientôt)
-                - 🔄 Autres modèles (bientôt)
-                """)
+                st.info("L'affinage des hyperparamètres est disponible pour Random Forest et Gradient Boosting.")
+
+
+def _train_tuned_model(df, target_col, task_type, test_size, use_cv, handle_imbalance, best_result, label, estimator) -> None:
+    """Réentraîne le meilleur modèle avec les hyperparamètres choisis et compare au score de base."""
+    with st.spinner("Réentraînement avec les nouveaux hyperparamètres..."):
+        tuned_results, _ = model_comparison.compare_models(
+            df,
+            target_col=target_col,
+            task=task_type,
+            test_size=test_size,
+            use_cv=use_cv,
+            handle_imbalance=handle_imbalance,
+            custom_models={label: estimator},
+        )
+
+    # Remplacer le modèle par le modèle affiné
+    if not (tuned_results and tuned_results[0]["success"]):
+        st.error("L'entraînement du modèle affiné a échoué.")
+        return
+    tuned_result = tuned_results[0]
+
+    # Comparer avec le modèle de base
+    st.markdown("---")
+    st.subheader("Résultats de l'affinage")
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric(
+            "Score Test",
+            f"{tuned_result['test_score']:.4f}",
+            delta=f"{tuned_result['test_score'] - best_result['test_score']:.4f}"
+        )
+    with col2:
+        st.metric(
+            "Score Train",
+            f"{tuned_result['train_score']:.4f}",
+            delta=f"{tuned_result['train_score'] - best_result['train_score']:.4f}"
+        )
+    with col3:
+        st.metric("Temps", f"{tuned_result['training_time']:.2f}s")
+
+    # Afficher un message selon l'amélioration
+    improvement = tuned_result['test_score'] - best_result['test_score']
+    if improvement > 0.01:
+        st.success(f"Amélioration significative : +{improvement:.4f}")
+    elif improvement > 0:
+        st.info(f"Légère amélioration : +{improvement:.4f}")
+    else:
+        st.warning(f"Pas d'amélioration : {improvement:.4f}")
+
+    # Sauvegarder le modèle affiné
+    st.session_state["clim_model"] = tuned_result["pipeline"]
+    st.session_state["clim_model_info"] = {
+        "task_type": task_type,
+        "model_name": f"{tuned_result['model_name']} (Affiné)",
+        "metric_name": tuned_result["metric_name"],
+        "metric_value": tuned_result["test_score"],
+        "target_col": target_col,  # Ajout de la variable cible
+        # Métriques de classification
+        "f1_score": tuned_result.get("f1_score"),
+        "precision": tuned_result.get("precision"),
+        "recall": tuned_result.get("recall"),
+        # Métriques de régression
+        "mse": tuned_result.get("mse"),
+        "rmse": tuned_result.get("rmse"),
+        "mae": tuned_result.get("mae"),
+        "r2": tuned_result.get("r2"),
+        "cv_scores": tuned_result["cv_scores"],
+        # Informations manquantes ajoutées
+        "train_shape": tuned_result.get("train_shape"),
+        "test_shape": tuned_result.get("test_shape"),
+        "feature_importance": tuned_result.get("feature_importance"),
+        "feature_names": tuned_result.get("feature_names"),
+    }
+
+    st.success("Modèle affiné sauvegardé !")
 
 
 def page_evaluation() -> None:
-    st.header(" Évaluation & Scénarios")
+    st.header("Évaluation & Scénarios")
     info = st.session_state.get("clim_model_info")
     if info is None:
         st.warning("Aucun modèle climat n’a encore été entraîné.")
         return
 
-    clim_evaluation.show_evaluation(info)
+    evaluation.show_evaluation(info)
 
 
 def page_maps() -> None:
     # Fusionner toutes les sources de données disponibles
     df_prep = st.session_state.get("clim_data_prep")
     data_sources = st.session_state.get("data_sources", {})
-    
+
     # Priorité : données prétraitées, sinon fusion des sources
     if isinstance(df_prep, pd.DataFrame) and not df_prep.empty:
         df = df_prep
@@ -1020,17 +838,17 @@ def page_maps() -> None:
     # Récupérer les sources de données et les données prétraitées
     data_sources = st.session_state.get("data_sources", {})
     df_prep = st.session_state.get("clim_data_prep")
-    
+
     # Ne pas afficher de titre ici car run_maps_page le fait déjà
-    clim_maps.run_maps_page(df, title="", data_sources=data_sources, df_prep=df_prep)
+    maps.run_maps_page(df, title="", data_sources=data_sources, df_prep=df_prep)
 
 
 def page_reporting() -> None:
     """Page de reporting avec le nouveau design exact du rapport exemple"""
-    st.header("📊 Reporting Climat")
-    
+    st.header("Reporting Climat")
+
     # Utilisation du nouveau module de reporting
-    clim_reporting_new.show_climate_reporting_summary(st.session_state)
+    reporting.show_climate_reporting_summary(st.session_state)
 
 
 if __name__ == "__main__":  # pragma: no cover

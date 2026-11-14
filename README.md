@@ -1,92 +1,60 @@
 # Data Tool Climatique
 
-[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+Application Streamlit d'analyse et de modélisation du risque climatique, développée
+pour un hackathon : cadrage du projet, chargement de plusieurs sources de données,
+exploration, prétraitement, modélisation, évaluation, cartographie et rapport HTML.
 
-Outil d'analyse du risque climatique pour le hackathon, permettant le traitement, l'analyse et la modélisation de données climatiques dans un contexte d'évaluation des risques.
+Application en ligne : https://climateriskanalytics.streamlit.app/
 
-Voici le lien : **https://climateriskanalytics.streamlit.app/**
+## Fonctionnalités
 
-##  Fonctionnalités
+| Section | Contenu |
+|---|---|
+| Cadrage du projet | Objectif métier (classification, régression, prévision), unité d'analyse, cible, contexte ; repris dans le rapport |
+| Chargement | Plusieurs fichiers CSV ou Excel étiquetés par type (climat, géographie, exposition, événements, autre), fusion automatique |
+| EDA climatique | Aperçu des données et série temporelle d'une variable |
+| Prétraitement | Conversion des dates, agrégation journalière ou mensuelle par identifiant, moyennes glissantes, détection d'anomalies |
+| Modélisation | Modèle unique, comparaison de modèles, affinage des hyperparamètres du meilleur modèle (Random Forest, Gradient Boosting) ; gestion du déséquilibre des classes, validation croisée, mode rapide |
+| Évaluation | Classification : matrice de confusion, métriques détaillées, courbes précision-rappel et ROC. Régression : prédictions contre valeurs réelles, résidus, métriques orientées risque. Analyse par segment |
+| Cartographie | Heatmap, points, marqueurs regroupés (Folium) ou gradient 3D (PyDeck), plusieurs fonds de carte, filtre temporel |
+| Reporting | Rapport HTML personnalisable (sections, titre, variable climatique), aperçu intégré et téléchargement |
 
-- **Chargement** de données climatiques et d'exposition (stations météo, séries temporelles, événements extrêmes)
-- **Prétraitement** adapté aux données climatiques (agrégations temporelles, jointures spatiales, gestion des unités)
-- **Analyse exploratoire** avec visualisations spécifiques (séries temporelles, cartes, heatmaps)
-- **Modélisation** avec comparaison de modèles adaptés aux risques climatiques
-- **Rapports** automatisés orientés décision
+Modèles disponibles : Random Forest, Gradient Boosting, régression logistique ou linéaire
+(Ridge, Lasso), Decision Tree, Extra Trees, AdaBoost, K-Nearest Neighbors, Naive Bayes.
 
-## Installation
+## Structure
 
-1. Clonez le dépôt :
-   ```bash
-   git clone https://github.com/votre-utilisateur/data-tool-climatique.git
-   cd data-tool-climatique
-   ```
+```
+clim_app.py                 Point d'entrée Streamlit : navigation et pages
+climatool/
+    data_loader.py          Lecture CSV / Excel
+    data_utils.py           Fusion des sources de données
+    preprocessing.py        Prétraitement climatique
+    model_utils.py          Détection du type de tâche, préprocesseur, importance des variables
+    model_comparison.py     Entraînement et comparaison des modèles
+    evaluation.py           Évaluation du modèle
+    maps.py                 Cartographie du risque
+    reporting.py            Rapport HTML
+    assets/style.css        Thème visuel
+```
 
-2. Créez et activez un environnement virtuel (recommandé) :
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # Sur Windows: .\venv\Scripts\activate
-   ```
+## Installation locale
 
-3. Installez les dépendances :
-   ```bash
-   pip install -r requirements.txt
-   ```
+Python 3.11 recommandé.
 
-## Utilisation
-
-Lancez l'application Streamlit :
 ```bash
-streamlit run modules/clim_app.py
+python -m venv .venv
+source .venv/bin/activate        # Windows : .venv\Scripts\activate
+pip install -r requirements.txt
+streamlit run clim_app.py
 ```
 
-##  Structure du projet
+## Notes techniques
 
-```
-data/                   # Données d'entrée
-├── raw/               # Données brutes
-└── processed/         # Données prétraitées
+- Le rapport est généré en mémoire et servi en téléchargement : aucun fichier n'est écrit
+  sur le serveur.
+- Les cartes ont besoin de colonnes de latitude et de longitude dans les données.
 
-modules/               # Code source de l'application
-├── clim_app.py        # Application principale Streamlit
-├── clim_data_loader.py # Chargement des données
-├── clim_preprocessing.py # Prétraitement
-├── clim_modeling.py   # Modélisation
-├── clim_evaluation.py # Évaluation des modèles
-└── clim_reporting.py  # Génération de rapports
+## Auteur
 
-outputs/               # Sorties générées
-├── models/            # Modèles entraînés
-└── reports/           # Rapports générés
-
-docs/                  # Documentation
-```
-
-## Fonctionnalités techniques
-
-- **Exploration des données** : Visualisations interactives des séries temporelles et cartes
-- **Prétraitement** : Gestion des valeurs manquantes, agrégations temporelles, création de features
-- **Modélisation** : Comparaison de plusieurs algorithmes de machine learning
-- **Évaluation** : Métriques adaptées au risque climatique
-- **Rapports** : Génération automatisée de rapports HTML
-
-## Contribution
-
-Les contributions sont les bienvenues ! Pour contribuer :
-
-1. Forkez le projet
-2. Créez une branche pour votre fonctionnalité (`git checkout -b feature/nouvelle-fonctionnalite`)
-3. Committez vos changements (`git commit -am 'Ajout d\'une nouvelle fonctionnalité'`)
-4. Poussez vers la branche (`git push origin feature/nouvelle-fonctionnalite`)
-5. Créez une Pull Request
-
-##  Licence
-
-Ce projet est sous licence MIT - voir le fichier [LICENSE](LICENSE) pour plus de détails.
-
-##  Contact
-
-Pour toute question, veuillez ouvrir une issue sur le dépôt.
-
-
+Yacoubou KOUMAI - licence MIT
