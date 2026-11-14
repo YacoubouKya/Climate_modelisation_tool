@@ -64,6 +64,41 @@ def analyze_by_segment(y_test: pd.Series, y_pred: pd.Series, segment_col: pd.Ser
 MAX_SEGMENTS = 30
 
 
+
+def classification_by_segment(segment, y_true, y_pred, y_proba=None) -> pd.DataFrame:
+    """Performance de classification par segment.
+
+    Pour un événement rare, l'accuracy d'un segment est presque toujours proche de 1 :
+    on présente donc le taux d'événements observé, le taux prédit moyen (calibration),
+    le rappel et l'AUC ROC lorsque le segment contient les deux classes.
+    """
+    from sklearn.metrics import roc_auc_score
+
+    df = pd.DataFrame({
+        "segment": np.asarray(segment),
+        "y": np.asarray(y_true),
+        "pred": np.asarray(y_pred),
+    })
+    binary = df["y"].nunique() == 2
+    if binary and y_proba is not None and np.ndim(y_proba) == 2 and np.shape(y_proba)[1] == 2:
+        df["proba"] = np.asarray(y_proba)[:, 1]
+    rows = []
+    positive = sorted(df["y"].unique())[-1]
+    for seg, g in df.groupby("segment", sort=True):
+        row = {"Segment": seg, "Observations": len(g)}
+        if binary:
+            pos = g["y"] == positive
+            row["Événements"] = int(pos.sum())
+            row["Taux observé"] = float(pos.mean())
+            if "proba" in g:
+                row["Taux prédit moyen"] = float(g["proba"].mean())
+            row["Rappel"] = float((g.loc[pos, "pred"] == positive).mean()) if pos.any() else np.nan
+            if "proba" in g:
+                row["AUC ROC"] = float(roc_auc_score(pos, g["proba"])) if 0 < pos.sum() < len(g) else np.nan
+        row["Accuracy"] = float((g["y"] == g["pred"]).mean())
+        rows.append(row)
+    return pd.DataFrame(rows)
+
 def segment_columns(X: pd.DataFrame) -> list[str]:
     """Colonnes catégorielles exploitables pour une analyse par segment.
 
@@ -363,28 +398,42 @@ def show_evaluation(info: dict) -> None:
                     segment_col = st.selectbox("Colonne de segmentation", options=cat_cols)
 
                     if segment_col:
-                        # Créer un DataFrame avec les résultats
-                        eval_df = pd.DataFrame({
-                            "segment": X_test[segment_col],
-                            "y_test": y_test,
-                            "y_pred": y_pred
-                        })
-
-                        # Calculer l'accuracy par segment
-                        segment_acc = eval_df.groupby("segment").apply(
-                            lambda g: (g["y_test"] == g["y_pred"]).mean()
-                        ).reset_index(name="accuracy")
-
-                        st.dataframe(segment_acc, width="stretch")
-
-                        # Graphique
-                        fig, ax = plt.subplots(figsize=(8, 4))
-                        ax.bar(segment_acc["segment"].astype(str), segment_acc["accuracy"])
-                        ax.set_xlabel(segment_col)
-                        ax.set_ylabel("Accuracy")
-                        ax.set_title(f"Performance par {segment_col}")
-                        plt.xticks(rotation=45, ha="right")
-                        st.pyplot(fig)
+                        seg_table = classification_by_segment(
+                            X_test[segment_col], y_test, y_pred, info.get("y_proba")
+                        )
+                        st.dataframe(
+                            seg_table,
+                            width="stretch",
+                            hide_index=True,
+                            column_config={
+                                "Taux observé": st.column_config.NumberColumn(format="percent"),
+                                "Taux prédit moyen": st.column_config.NumberColumn(format="percent"),
+                                "Rappel": st.column_config.NumberColumn(format="%.2f"),
+                                "AUC ROC": st.column_config.NumberColumn(format="%.3f"),
+                                "Accuracy": st.column_config.NumberColumn(format="%.3f"),
+                            },
+                        )
+                        metric = "AUC ROC" if "AUC ROC" in seg_table and seg_table["AUC ROC"].notna().any() else "Accuracy"
+                        st.caption(
+                            "Taux prédit moyen proche du taux observé : le modèle est bien calibré sur le segment. "
+                            "L'AUC ROC mesure la capacité à classer les jours à risque avant les autres ; elle n'est "
+                            "calculée que si le segment contient au moins un événement et un non-événement dans le test."
+                        )
+                        plot_df = seg_table.dropna(subset=[metric])
+                        if not plot_df.empty:
+                            fig, ax = plt.subplots(figsize=(8, 4))
+                            ax.bar(plot_df["Segment"].astype(str), plot_df[metric], color="#3498db")
+                            ax.set_xlabel(segment_col)
+                            ax.set_ylabel(metric)
+                            ax.set_ylim(0, 1)
+                            if metric == "AUC ROC":
+                                ax.axhline(0.5, color="grey", linestyle="--", linewidth=1, label="Hasard")
+                                ax.legend()
+                            ax.set_title(f"{metric} par {segment_col}")
+                            plt.xticks(rotation=45, ha="right")
+                            plt.tight_layout()
+                            st.pyplot(fig)
+                            plt.close(fig)
 
     else:
         st.subheader("Prédictions vs valeurs réelles")

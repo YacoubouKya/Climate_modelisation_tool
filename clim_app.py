@@ -1037,7 +1037,7 @@ def page_pricing() -> None:
         .mark_bar(color="#FFD700")
         .encode(
             x=alt.X("Prime commerciale par unité:Q", title="Prime commerciale annuelle par unité"),
-            y=alt.Y("Segment:N", sort="-x", title=None),
+            y=alt.Y("Segment:N", sort="-x", title=None, axis=alt.Axis(labelOverlap=False, labelLimit=250)),
             tooltip=["Segment", alt.Tooltip("Prime pure par unité:Q", format=".2f"),
                      alt.Tooltip("Prime commerciale par unité:Q", format=".2f")],
         )
