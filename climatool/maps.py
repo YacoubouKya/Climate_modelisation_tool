@@ -39,8 +39,9 @@ COLOR_PALETTES = {
 TILE_LAYERS = {
     "CartoDB Positron": "CartoDB positron",
     "OpenStreetMap": "OpenStreetMap",
-    "Stamen Terrain": "Stamen Terrain",
-    "Stamen TonerLite": "Stamen TonerLite",
+    "Relief (OpenTopoMap)": "OpenTopoMap",
+    "Satellite (Esri)": "Esri.WorldImagery",
+    "Sombre (CartoDB)": "CartoDB dark_matter",
 }
 
 
@@ -60,11 +61,11 @@ def detect_lat_lon_columns(df: pd.DataFrame) -> tuple[Optional[str], Optional[st
 def _recommend_viz_type(n_points: int) -> str:
     """Recommande le type de visualisation selon le nombre de points."""
     if n_points > 2000:
-        return " Heatmap (Climatique)"  # Seule option viable
+        return "Heatmap (Climatique)"  # Seule option viable
     elif n_points > 500:
-        return " Heatmap (Climatique)"  # Recommandée (markers trop lent)
+        return "Heatmap (Climatique)"  # Recommandée (markers trop lent)
     elif n_points > 50:
-        return " Markers + Clusters"  # Bon compromis
+        return "Markers + Clusters"  # Bon compromis
     else:
         return "Markers + Clusters"  # Mieux pour détail
 
@@ -126,12 +127,18 @@ def _prepare_map_data(
         raise ValueError(f"Latitude non numérique : {map_df['latitude'].dtype}")
     if not pd.api.types.is_numeric_dtype(map_df["longitude"]):
         raise ValueError(f"Longitude non numérique : {map_df['longitude'].dtype}")
+    # Types Python simples : folium sérialise en JSON et refuse les entiers numpy
+    map_df["latitude"] = map_df["latitude"].astype(float)
+    map_df["longitude"] = map_df["longitude"].astype(float)
+    if map_df["latitude"].abs().max() > 90:
+        raise ValueError("La colonne latitude contient des valeurs hors de [-90, 90] : vérifiez le choix des colonnes.")
 
     if color_col and color_col in df.columns:
         map_df["risk_value"] = df[color_col]
         if not pd.api.types.is_numeric_dtype(map_df["risk_value"]):
             map_df["risk_value"] = pd.to_numeric(map_df["risk_value"], errors="coerce")
             map_df = map_df.dropna(subset=["risk_value"])
+        map_df["risk_value"] = map_df["risk_value"].astype(float)
 
     return map_df
 
@@ -200,7 +207,10 @@ def show_heatmap_folium(
                     popup=f"Lat: {row['latitude']:.4f}, Lon: {row['longitude']:.4f}",
                 ).add_to(m)
 
-        st_folium(m, width=1200, height=600)
+        m.fit_bounds([[map_df["latitude"].min(), map_df["longitude"].min()],
+                      [map_df["latitude"].max(), map_df["longitude"].max()]], padding=(30, 30))
+        # returned_objects=[] : la carte ne relance pas l'application à chaque déplacement
+        st_folium(m, height=600, use_container_width=True, returned_objects=[])
         return m
 
     except Exception as e:
@@ -262,7 +272,10 @@ def show_simple_points_folium(
                     weight=1,
                 ).add_to(m)
 
-        st_folium(m, width=1200, height=600)
+        m.fit_bounds([[map_df["latitude"].min(), map_df["longitude"].min()],
+                      [map_df["latitude"].max(), map_df["longitude"].max()]], padding=(30, 30))
+        # returned_objects=[] : la carte ne relance pas l'application à chaque déplacement
+        st_folium(m, height=600, use_container_width=True, returned_objects=[])
         return m
 
     except Exception as e:
@@ -325,7 +338,10 @@ def show_markers_folium(
                     popup="Localisation",
                 ).add_to(marker_cluster)
 
-        st_folium(m, width=1200, height=600)
+        m.fit_bounds([[map_df["latitude"].min(), map_df["longitude"].min()],
+                      [map_df["latitude"].max(), map_df["longitude"].max()]], padding=(30, 30))
+        # returned_objects=[] : la carte ne relance pas l'application à chaque déplacement
+        st_folium(m, height=600, use_container_width=True, returned_objects=[])
         return m
 
     except Exception as e:
@@ -380,53 +396,46 @@ def show_gradient_3d_pydeck(
     map_df: pd.DataFrame,
     color_palette: str = "Viridis",
 ) -> None:
-    """Affiche gradients 3D avec PyDeck (haute performance)."""
+    """Colonnes 3D (PyDeck) : la hauteur et la couleur suivent la valeur de risque."""
     try:
-        if "risk_value" not in map_df.columns:
-            st.warning("Aucune valeur de risque. Affichage simple.")
+        data = map_df.copy()
+        span_deg = max(data["latitude"].max() - data["latitude"].min(),
+                       data["longitude"].max() - data["longitude"].min(), 0.5)
+        radius = float(np.clip(span_deg * 111_000 / 60, 1_000, 30_000))
+        if "risk_value" not in data.columns:
+            st.info("Choisissez une variable de risque pour donner une hauteur aux colonnes.")
+            data["risk_value"] = 1.0
+        vmin, vmax = data["risk_value"].min(), data["risk_value"].max()
+        norm = (data["risk_value"] - vmin) / (vmax - vmin) if vmax > vmin else pd.Series(0.5, index=data.index)
+        palette = COLOR_PALETTES.get(color_palette, COLOR_PALETTES["Viridis"])
+        rgb = [tuple(int(h.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4)) for h in palette]
+        idx = (norm * (len(rgb) - 1)).round().astype(int)
+        data["r"], data["g"], data["b"] = zip(*[rgb[i] for i in idx])
+        data["hauteur"] = 0.1 + 0.9 * norm
+        data["libelle"] = data["risk_value"].map(lambda v: f"{v:,.2f}".replace(",", " "))
 
-            layer = pdk.Layer(
-                "ScatterplotLayer",
-                data=map_df,
-                get_position=["longitude", "latitude"],
-                get_color="[100, 150, 255, 160]",
-                get_radius=5000,
-                pickable=True,
-            )
-        else:
-            min_val = map_df["risk_value"].min()
-            max_val = map_df["risk_value"].max()
-            COLOR_PALETTES.get(color_palette, COLOR_PALETTES["Viridis"])
-
-            # Normaliser pour couleur RGB
-            map_df["color_norm"] = (
-                (map_df["risk_value"] - min_val) / (max_val - min_val) * 255
-                if max_val > min_val
-                else 128
-            ).astype(int)
-
-            layer = pdk.Layer(
-                "ScatterplotLayer",
-                data=map_df,
-                get_position=["longitude", "latitude"],
-                get_color="[255 - color_norm, color_norm, 100, 200]",
-                get_radius=8000,
-                pickable=True,
-            )
-
+        layer = pdk.Layer(
+            "ColumnLayer",
+            data=data,
+            get_position=["longitude", "latitude"],
+            get_elevation="hauteur",
+            elevation_scale=radius * 40,
+            radius=radius,
+            get_fill_color="[r, g, b, 210]",
+            pickable=True,
+            extruded=True,
+        )
         view_state = pdk.ViewState(
-            latitude=map_df["latitude"].mean(),
-            longitude=map_df["longitude"].mean(),
-            zoom=5,
+            latitude=data["latitude"].mean(),
+            longitude=data["longitude"].mean(),
+            zoom=float(np.clip(8 - np.log2(span_deg), 3, 12)),
             pitch=45,
         )
-
         r = pdk.Deck(
             layers=[layer],
             initial_view_state=view_state,
-            tooltip={"text": "Risque: {risk_value:.2f}"},
+            tooltip={"text": "Risque : {libelle}"},
         )
-
         st.pydeck_chart(r)
 
     except Exception as e:
@@ -479,23 +488,48 @@ def run_maps_page(
     st.markdown("---")
     st.subheader("Configuration de la carte")
 
+    coord_candidates = [
+        c for c in selected_df.select_dtypes(include=["number"]).columns
+        if selected_df[c].notna().any() and selected_df[c].abs().max() <= 180
+    ]
+    if len(coord_candidates) < 2:
+        st.info("Cette source n'a pas de coordonnées (latitude et longitude numériques). "
+                "Choisissez une source qui en contient, par exemple les données climatiques ou la fusion.")
+        return
+
+    lat_candidates = [c for c in coord_candidates if selected_df[c].abs().max() <= 90]
     auto_lat, auto_lon = detect_lat_lon_columns(selected_df)
+    if not lat_candidates:
+        st.info("Aucune colonne ne ressemble à une latitude (valeurs entre -90 et 90).")
+        return
+    if auto_lat not in lat_candidates or auto_lon not in coord_candidates or auto_lat == auto_lon:
+        st.info("Colonnes latitude/longitude non trouvées automatiquement. Sélectionnez-les ci-dessous.")
+        auto_lat = lat_candidates[0]
+        auto_lon = next(c for c in coord_candidates if c != auto_lat)
 
-    if not auto_lat or not auto_lon:
-        st.info("Colonnes latitude/longitude non trouvées automatiquement. Sélectionnez-les manuellement ci-dessous.")
+    col_lat, col_lon = st.columns(2)
+    with col_lat:
+        lat_col = st.selectbox("Colonne latitude", options=lat_candidates,
+                               index=lat_candidates.index(auto_lat))
+    with col_lon:
+        lon_options = [c for c in coord_candidates if c != lat_col]
+        lon_col = st.selectbox("Colonne longitude", options=lon_options,
+                               index=lon_options.index(auto_lon) if auto_lon in lon_options else 0)
 
-    lat_index = selected_df.columns.get_loc(auto_lat) if auto_lat and auto_lat in selected_df.columns else 0
-    lon_index = selected_df.columns.get_loc(auto_lon) if auto_lon and auto_lon in selected_df.columns else (1 if len(selected_df.columns) > 1 else 0)
-
-    lat_col = st.selectbox("Colonne latitude", options=selected_df.columns.tolist(), index=lat_index)
-    lon_col = st.selectbox("Colonne longitude", options=selected_df.columns.tolist(), index=lon_index)
-
-    numeric_cols = selected_df.select_dtypes(include=["number"]).columns.tolist()
+    numeric_cols = [c for c in selected_df.select_dtypes(include=["number"]).columns if c not in (lat_col, lon_col)]
     color_col: Optional[str] = None
     if numeric_cols:
-        color_col = st.selectbox("Variable numérique pour le risque (optionnel)", options=["(aucune)"] + numeric_cols)
+        guess = next((c for c in numeric_cols if any(k in c.lower() for k in ("cout", "sinistre", "inond", "precip"))), None)
+        color_options = ["(aucune)"] + numeric_cols
+        color_col = st.selectbox("Variable numérique pour le risque (optionnel)", options=color_options,
+                                 index=color_options.index(guess) if guess else 0)
         if color_col == "(aucune)":
             color_col = None
+    aggregate_points = st.checkbox(
+        "Une valeur par lieu (moyenne sur la période)", value=True,
+        help="Les données quotidiennes répètent les mêmes coordonnées chaque jour : la moyenne par lieu "
+             "donne une carte lisible et rapide.",
+    )
 
     st.markdown("---")
     st.subheader("Options de visualisation")
@@ -503,10 +537,11 @@ def run_maps_page(
     # Préparation rapide pour compter les points
     try:
         temp_map_df = _prepare_map_data(selected_df, lat_col, lon_col, color_col)
-        n_points = len(temp_map_df)
+        n_points = (temp_map_df[["latitude", "longitude"]].drop_duplicates().shape[0]
+                    if aggregate_points else len(temp_map_df))
         recommended_viz = _recommend_viz_type(n_points)
     except ValueError:
-        recommended_viz = " Heatmap (Climatique)"
+        recommended_viz = "Heatmap (Climatique)"
         n_points = 0
 
     col1, col2, col3 = st.columns(3)
@@ -521,7 +556,7 @@ def run_maps_page(
                 "Gradient 3D (PyDeck)",
             ],
             index=0 if "Heatmap" in recommended_viz else (1 if "Points" in recommended_viz else (2 if "Markers" in recommended_viz else 3)),
-            help=f" Recommandé pour {n_points} points : {recommended_viz}"
+            help=f"Recommandé pour {n_points} points : {recommended_viz}"
         )
 
     with col2:
@@ -532,7 +567,9 @@ def run_maps_page(
         color_palette = st.selectbox("Palette de couleurs", options=list(COLOR_PALETTES.keys()))
 
     # Filtre temporel si colonne date disponible
-    date_cols = [c for c in selected_df.columns if "date" in c.lower() or "time" in c.lower()]
+    date_cols = [c for c in selected_df.columns
+                 if pd.api.types.is_datetime64_any_dtype(selected_df[c])
+                 or (not pd.api.types.is_numeric_dtype(selected_df[c]) and ("date" in c.lower() or "time" in c.lower()))]
     df_filtered = selected_df.copy()
 
     if date_cols:
@@ -578,10 +615,13 @@ def run_maps_page(
         st.error(f"{e}")
         return
 
-    # Validation lat != lon
-    if lat_col == lon_col:
-        st.error("Les colonnes latitude et longitude ne peuvent pas être identiques !")
-        return
+    if aggregate_points:
+        agg = {"risk_value": "mean"} if "risk_value" in map_df.columns else {}
+        if agg:
+            map_df = map_df.groupby(["latitude", "longitude"], as_index=False).agg(agg)
+        else:
+            map_df = map_df.drop_duplicates(["latitude", "longitude"])
+        st.caption(f"{len(map_df)} lieux distincts" + (f", {color_col} moyen par lieu." if color_col else "."))
 
     st.markdown("---")
     st.subheader("Carte")
@@ -590,25 +630,25 @@ def run_maps_page(
     render_start = time.time()
     folium_map = None
 
-    if viz_type == " Heatmap (Climatique)":
+    if viz_type == "Heatmap (Climatique)":
         if not FOLIUM_AVAILABLE:
             st.error("Folium non installé. Installer avec : `pip install folium streamlit-folium`")
         else:
             folium_map = show_heatmap_folium(map_df, color_col, tile_layer)
 
-    elif viz_type == " Points simples":
+    elif viz_type == "Points simples":
         if not FOLIUM_AVAILABLE:
             st.error("Folium non installé. Installer avec : `pip install folium streamlit-folium`")
         else:
             folium_map = show_simple_points_folium(map_df, color_col, tile_layer)
 
-    elif viz_type == " Markers + Clusters":
+    elif viz_type == "Markers + Clusters":
         if not FOLIUM_AVAILABLE:
             st.error("Folium non installé. Installer avec : `pip install folium streamlit-folium`")
         else:
             folium_map = show_markers_folium(map_df, color_col, tile_layer)
 
-    elif viz_type == " Gradient 3D (PyDeck)":
+    elif viz_type == "Gradient 3D (PyDeck)":
         show_gradient_3d_pydeck(map_df, color_palette)
 
     render_time = time.time() - render_start
@@ -631,7 +671,7 @@ def run_maps_page(
         with col_dl2:
             geojson_data = export_data_geojson(map_df, lat_col, lon_col)
             st.download_button(
-                label=" Télécharger Données (GeoJSON)",
+                label="Télécharger Données (GeoJSON)",
                 data=geojson_data,
                 file_name=f"donnees_{datetime.now().strftime('%Y%m%d_%H%M%S')}.geojson",
                 mime="application/json",
@@ -640,7 +680,5 @@ def run_maps_page(
     # Afficher aperçu des données
     st.markdown("---")
     st.subheader("Aperçu des données")
-    cols_to_show = [lat_col, lon_col]
-    if color_col:
-        cols_to_show.append(color_col)
-    st.dataframe(df_filtered[cols_to_show].head(10), width="stretch")
+    preview = map_df.rename(columns={"risk_value": color_col}) if color_col else map_df
+    st.dataframe(preview.head(20), width="stretch", hide_index=True)
