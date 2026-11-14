@@ -1,9 +1,9 @@
 zone,altitude,type_zone,nb_biens,valeur_assuree_moyenne
-Lome,10,urbain,5200,42000
-Aneho,8,urbain,1300,30000
-Tsevie,60,rural,900,22000
-Atakpame,400,rural,1100,24000
-Sokode,400,urbain,1800,26000
-Kara,340,urbain,2100,28000
-Dapaong,290,rural,700,18000
-Kpalime,250,rural,950,21000
+Paris,35,urbain,6800,310000
+Lyon,170,urbain,3900,240000
+Nimes,40,urbain,2100,210000
+Montpellier,27,urbain,2600,230000
+Nantes,8,urbain,2400,220000
+Strasbourg,142,urbain,2200,215000
+Quimperle,30,rural,650,170000
+Sommieres,35,rural,480,180000
