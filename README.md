@@ -65,7 +65,7 @@ streamlit run clim_app.py
 ## Données d'exemple
 
 Le dossier `docs/donnees_exemple/` contient un jeu de données synthétique pour tester
-toutes les pages : météo journalière de 8 zones du Togo (2022-2024), exposition par zone
+toutes les pages : météo journalière de huit communes françaises (2022-2024), portefeuille assuré par commune en euros
 et inondations avec leur coût. Chargez les trois fichiers avec les types climat,
 exposition et événements, fusionnez, puis suivez les pages dans l'ordre. Le script
 `generer_donnees.py` permet de les recréer.
