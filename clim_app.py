@@ -52,7 +52,7 @@ def main() -> None:
             'clim_data': None,
             'clim_data_prep': None,
             'clim_prep_info': {},
-            'clim_model_info': {},
+            'clim_model_info': None,
             'project_framing': {},
             'data_sources': {}
         })
@@ -136,7 +136,7 @@ def page_framing() -> None:
         st.success("Cadrage enregistré ! Vous pouvez maintenant charger vos données.")
 
     # Afficher le cadrage actuel si déjà enregistré
-    if "project_framing" in st.session_state:
+    if st.session_state.get("project_framing"):
         st.markdown("---")
         st.subheader("Cadrage actuel")
         framing = st.session_state["project_framing"]
@@ -664,7 +664,7 @@ def page_modeling() -> None:
                     min_samples_split = st.slider("min_samples_split", 2, 20, default_min_samples_split, 1, key="tune_min_split")
 
                 if st.button("Affiner le modèle"):
-                    task_type = st.session_state.get("clim_model_info", {}).get("task_type", detected_task)
+                    task_type = (st.session_state.get("clim_model_info") or {}).get("task_type", detected_task)
                     if task_type == "classification":
                         tuned_model = RandomForestClassifier(
                             n_estimators=n_estimators,
@@ -696,7 +696,7 @@ def page_modeling() -> None:
                     max_depth = st.slider("max_depth", 3, 10, 3, 1, key="tune_gb_depth")
 
                 if st.button("Affiner le modèle"):
-                    task_type = st.session_state.get("clim_model_info", {}).get("task_type", detected_task)
+                    task_type = (st.session_state.get("clim_model_info") or {}).get("task_type", detected_task)
                     params = dict(n_estimators=n_estimators, learning_rate=learning_rate,
                                   max_depth=max_depth, random_state=42)
                     tuned_model = (GradientBoostingClassifier(**params) if task_type == "classification"
