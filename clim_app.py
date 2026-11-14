@@ -21,7 +21,7 @@ import streamlit as st
 from climatool import data_loader, evaluation, maps, model_comparison, preprocessing, pricing, reporting, tuning
 from climatool.data_utils import merge_dataframes
 
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.3.0"
 CSS_FILE = Path(__file__).parent / "climatool" / "assets" / "style.css"
 
 
@@ -141,81 +141,74 @@ def page_framing() -> None:
             st.markdown(f"**Contexte :** {framing['context']}")
 
 
-def _select_data_source(page: str, prefer_prepared: bool = True) -> pd.DataFrame:
-    """Helper pour sélectionner la source de données à utiliser."""
-    try:
-        data_sources = st.session_state.get("data_sources", {})
-        df_prep = st.session_state.get("clim_data_prep")
-
-        # Options disponibles - Ordre : Climat d'abord, Fusion en dernier
-        options = []
-
-        # 1. Ajouter les sources individuelles (Climat en priorité)
-        if data_sources:
-            # Priorité à "Climat" s'il existe
-            if "Climat" in data_sources:
-                options.append("Source : Climat")
-            # Puis les autres sources dans l'ordre
-            for label in data_sources.keys():
-                if label != "Climat":
-                    options.append(f"Source : {label}")
-
-        # 2. Ajouter l'option de fusion (avant les données prétraitées)
-        if data_sources and len(data_sources) > 1:
-            options.append("Fusionner toutes les sources")
-
-        # 3. Ajouter les données prétraitées en dernier
-        if isinstance(df_prep, pd.DataFrame) and not df_prep.empty:
-            options.append("Données prétraitées (fusionnées)")
-
-        if not options:
+def _merged_sources() -> pd.DataFrame | None:
+    """Fusion des sources chargées, mise en cache jusqu'au prochain ajout ou retrait de source."""
+    if "merged_data" not in st.session_state:
+        try:
+            st.session_state["merged_data"] = merge_dataframes(list(st.session_state.get("data_sources", {}).values()))
+        except (ValueError, TypeError) as e:
+            st.error(f"Erreur lors de la fusion des données : {e}")
             return None
-    except Exception as e:
-        st.error(f"Erreur lors de la sélection de la source : {e}")
+    return st.session_state["merged_data"]
+
+
+def _resolve_source(option: str) -> pd.DataFrame | None:
+    if "prétraitées" in option:
+        return st.session_state.get("clim_data_prep")
+    if "Fusionner" in option:
+        return _merged_sources()
+    return st.session_state.get("data_sources", {}).get(option.replace("Source : ", ""))
+
+
+def _select_data_source(page: str, prefer_prepared: bool = True,
+                        required_cols: list[str] | None = None) -> pd.DataFrame | None:
+    """Choix de la source de données d'une page.
+
+    Avec ``required_cols``, seules les sources qui contiennent toutes ces colonnes sont
+    proposées (par exemple celles sur lesquelles le modèle a été entraîné).
+    """
+    data_sources = st.session_state.get("data_sources", {}) or {}
+    df_prep = st.session_state.get("clim_data_prep")
+
+    # Ordre : Climat, autres sources, fusion, données prétraitées
+    options = []
+    if "Climat" in data_sources:
+        options.append("Source : Climat")
+    options += [f"Source : {label}" for label in data_sources if label != "Climat"]
+    if len(data_sources) > 1:
+        options.append("Fusionner toutes les sources")
+    if isinstance(df_prep, pd.DataFrame) and not df_prep.empty:
+        options.append("Données prétraitées (fusionnées)")
+
+    if required_cols:
+        def has_cols(option: str) -> bool:
+            if "Fusionner" in option:
+                # Évite de calculer la fusion juste pour vérifier ses colonnes
+                cols = set().union(*(set(d.columns) for d in data_sources.values()))
+            else:
+                d = _resolve_source(option)
+                cols = set(d.columns) if isinstance(d, pd.DataFrame) else set()
+            return set(required_cols) <= cols
+        options = [o for o in options if has_cols(o)]
+
+    if not options:
         return None
-
-    # Si une seule option, la retourner directement sans UI
     if len(options) == 1:
-        if "prétraitées" in options[0]:
-            return df_prep
-        elif "Fusionner" in options[0]:
-            # Cache la fusion
-            if "merged_data" not in st.session_state:
-                try:
-                    st.session_state["merged_data"] = merge_dataframes(list(data_sources.values()))
-                except (ValueError, TypeError) as e:
-                    st.error(f"Erreur lors de la fusion des données : {e}")
-                    return None
-            return st.session_state["merged_data"]
-        else:
-            source_label = options[0].replace("Source : ", "")
-            return data_sources[source_label]
+        return _resolve_source(options[0])
 
-    # Sinon, proposer un selectbox
-    # Un choix par page ; par défaut les données prétraitées si elles existent
-    # (sauf pour le prétraitement lui-même, qui part des données brutes fusionnées).
+    # Par défaut les données prétraitées si elles existent (sauf pour le prétraitement
+    # lui-même, qui part des données brutes fusionnées).
     if prefer_prepared and any("prétraitées" in o for o in options):
         default = next(i for i, o in enumerate(options) if "prétraitées" in o)
     elif any("Fusionner" in o for o in options):
         default = next(i for i, o in enumerate(options) if "Fusionner" in o)
     else:
         default = 0
-    choice = st.selectbox("Choisir la source de données", options, index=default, key=f"data_source_{page}")
-
-    if "prétraitées" in choice:
-        return df_prep
-    elif "Fusionner" in choice:
-        # Cache la fusion
-        if "merged_data" not in st.session_state:
-            try:
-                st.session_state["merged_data"] = merge_dataframes(list(data_sources.values()))
-            except (ValueError, TypeError) as e:
-                st.error(f"Erreur lors de la fusion des données : {e}")
-                return None
-        return st.session_state["merged_data"]
-    else:
-        source_label = choice.replace("Source : ", "")
-        return data_sources[source_label]
+    key = f"data_source_{page}"
+    if key in st.session_state and st.session_state[key] not in options:
+        del st.session_state[key]
+    choice = st.selectbox("Choisir la source de données", options, index=default, key=key)
+    return _resolve_source(choice)
 
 
 def page_loading() -> None:
@@ -301,26 +294,46 @@ def page_eda() -> None:
     st.dataframe(df.head(10), width="stretch", height=300)
 
     st.subheader("Série temporelle simple")
-    date_col = st.selectbox("Colonne date", options=["(aucune)"] + df.columns.tolist())
-    num_cols = df.select_dtypes(include=["number"]).columns.tolist()
+    date_candidates = _date_columns(df)
+    if not date_candidates:
+        st.info("Aucune colonne date dans cette source : choisissez une autre source pour tracer une série temporelle.")
+        return
+    date_col = st.selectbox("Colonne date", options=date_candidates)
+    id_cols = [c for c in df.columns if not pd.api.types.is_numeric_dtype(df[c]) and c != date_col
+               and 1 < df[c].nunique() <= 50]
+    num_cols = [c for c in df.select_dtypes(include=["number"]).columns if c not in ("latitude", "longitude")]
     value_col = st.selectbox("Variable à tracer", options=num_cols) if num_cols else None
 
-    if date_col != "(aucune)" and value_col:
+    group_col = None
+    if id_cols:
+        group_col = id_cols[0]
+        groups = st.multiselect(f"{group_col} à afficher", options=sorted(df[group_col].dropna().unique().tolist()),
+                                default=sorted(df[group_col].dropna().unique().tolist())[:3])
+    if value_col:
         try:
-            tmp = df[[date_col, value_col]].copy()
+            cols = [date_col, value_col] + ([group_col] if group_col else [])
+            tmp = df[cols].copy()
+            if group_col:
+                tmp = tmp[tmp[group_col].isin(groups)]
             tmp[date_col] = pd.to_datetime(tmp[date_col], errors="coerce")
             tmp = tmp.dropna(subset=[date_col])
             tmp = tmp.sort_values(date_col)
 
             # Si énormément de points, on échantillonne pour ne pas saturer le navigateur
             max_points = 2000  # Réduit de 5000 à 2000 pour meilleures performances
-            if len(tmp) > max_points:
+            if len(tmp) > max_points and not group_col:
                 tmp = tmp.iloc[:: int(len(tmp) / max_points) + 1, :]
+            elif group_col and len(tmp) > max_points:
+                # Moyenne hebdomadaire par groupe plutôt qu'un sous-échantillon qui hacherait les courbes
+                tmp = (tmp.groupby([group_col, pd.Grouper(key=date_col, freq="W")])[value_col]
+                       .mean().reset_index())
 
             chart = (
                 alt.Chart(tmp)
-                .mark_line(color="#FFD700", strokeWidth=2)
+                .mark_line(strokeWidth=1.5)
                 .encode(
+                    color=(alt.Color(f"{group_col}:N", title=group_col) if group_col
+                           else alt.value("#FFD700")),
                     x=alt.X(
                         date_col,
                         type="temporal",
@@ -364,16 +377,19 @@ def page_preprocessing() -> None:
     st.subheader("1. Temps et identifiants")
     col1, col2 = st.columns(2)
     with col1:
-        date_options = ["(aucune)"] + df.columns.tolist()
-        date_guess = next((c for c in df.columns if "date" in c.lower()), "(aucune)")
-        date_col = st.selectbox("Colonne date", options=date_options, index=date_options.index(date_guess))
+        date_options = ["(aucune)"] + _date_columns(df)
+        date_col = st.selectbox("Colonne date", options=date_options, index=1 if len(date_options) > 1 else 0)
+    has_date = date_col != "(aucune)"
     with col2:
         freq = st.selectbox(
             "Agrégation temporelle",
-            options=["Aucune", "Jour", "Mois"],
+            options=["Aucune", "Jour", "Mois"] if has_date else ["Aucune"],
             index=0,
             help="Regroupe les observations par période et par identifiant.",
         )
+    if not has_date:
+        st.info("Cette source n'a pas de colonne date : l'agrégation temporelle et les variables "
+                "glissantes ne s'appliquent pas. Seul le contrôle des valeurs extrêmes est disponible.")
     id_guess = [c for c in text_cols if any(k in c.lower() for k in ("zone", "station", "site", "commune", "region", "id"))]
     id_cols = st.multiselect(
         "Colonnes d'identifiant (zone, station...)",
@@ -393,24 +409,31 @@ def page_preprocessing() -> None:
                  "les autres la moyenne.",
         )
 
-    st.subheader("2. Variables construites")
-    unit = {"Mois": "mois"}.get(freq, "jours")
-    windows = st.multiselect(
-        f"Fenêtres glissantes (en {unit})",
-        options=[2, 3, 5, 7, 14, 30],
-        default=[3, 7],
-    )
-    use_cumul = st.checkbox(
-        "Cumuls glissants (ex. pluie cumulée sur 3 et 7 jours)",
-        value=False,
-        help="Souvent la variable la plus explicative du risque d'inondation.",
-    )
-    cumul_guess = [c for c in num_cols if any(k in c.lower() for k in ("precip", "pluie"))]
-    cumul_cols = st.multiselect("Colonnes à cumuler", options=num_cols, default=cumul_guess) if use_cumul else []
-    use_rolling = st.checkbox("Moyennes glissantes (ex. température moyenne sur 7 jours)", value=False)
-    rolling_cols = st.multiselect("Colonnes à lisser", options=num_cols) if use_rolling else []
+    windows: list[int] = [3, 7]
+    use_cumul = use_rolling = False
+    cumul_cols: list[str] = []
+    rolling_cols: list[str] = []
+    if has_date:
+        st.subheader("2. Variables construites")
+        unit = {"Mois": "mois"}.get(freq, "jours")
+        windows = st.multiselect(
+            f"Fenêtres glissantes (en {unit})",
+            options=[2, 3, 5, 7, 14, 30],
+            default=[3, 7],
+        )
+        use_cumul = st.checkbox(
+            "Cumuls glissants (ex. pluie cumulée sur 3 et 7 jours)",
+            value=False,
+            help="Souvent la variable la plus explicative du risque d'inondation.",
+        )
+        cumul_guess = [c for c in num_cols if any(k in c.lower() for k in ("precip", "pluie"))]
+        cumul_cols = st.multiselect("Colonnes à cumuler", options=num_cols, default=cumul_guess) if use_cumul else []
+        use_rolling = st.checkbox("Moyennes glissantes (ex. température moyenne sur 7 jours)", value=False)
+        rolling_cols = st.multiselect("Colonnes à lisser", options=num_cols) if use_rolling else []
+        if (use_cumul or use_rolling) and not windows:
+            st.warning("Choisissez au moins une fenêtre glissante.")
 
-    st.subheader("3. Contrôle qualité")
+    st.subheader("3. Contrôle qualité" if has_date else "2. Contrôle qualité")
     use_anomaly = st.checkbox("Signaler les valeurs extrêmes (écart à la moyenne de plus de 3 écarts-types)", value=False)
     anomaly_cols = st.multiselect("Colonnes à contrôler", options=num_cols, key="anomaly_cols") if use_anomaly else []
 
@@ -476,6 +499,42 @@ def page_preprocessing() -> None:
                 st.exception(e)
 
 
+_ID_WORDS = ("zone", "station", "site", "commune", "region", "région", "ville", "pays", "id")
+_COORD_WORDS = ("latitude", "longitude", "lat", "lon", "lng")
+
+
+def _date_columns(df: pd.DataFrame) -> list[str]:
+    """Colonnes de type date, ou textes dont presque toutes les valeurs se lisent comme des dates."""
+    out = []
+    for c in df.columns:
+        s = df[c]
+        if pd.api.types.is_datetime64_any_dtype(s):
+            out.append(c)
+        elif not pd.api.types.is_numeric_dtype(s) and s.notna().any():
+            sample = s.dropna().astype(str).head(200)
+            if pd.to_datetime(sample, errors="coerce", format="mixed").notna().mean() >= 0.9:
+                out.append(c)
+    return out
+
+
+def _target_columns(df: pd.DataFrame) -> list[str]:
+    """Cibles possibles : variables numériques non constantes ou catégories (2 à 10 modalités),
+    hors dates, coordonnées et identifiants."""
+    dates = set(_date_columns(df))
+    out = []
+    for c in df.columns:
+        name = c.lower()
+        if c in dates or name in _COORD_WORDS or any(w == name or name.startswith(w + "_") for w in _ID_WORDS):
+            continue
+        n = df[c].nunique()
+        if pd.api.types.is_numeric_dtype(df[c]):
+            if n > 1:
+                out.append(c)
+        elif 2 <= n <= 10:
+            out.append(c)
+    return out
+
+
 def _is_binary(series: pd.Series) -> bool:
     return pd.api.types.is_numeric_dtype(series) and set(series.dropna().unique()) <= {0, 1} and series.nunique() == 2
 
@@ -495,7 +554,8 @@ def _leakage_suspects(df: pd.DataFrame, target_col: str) -> list[str]:
             if ((x.fillna(0) != 0).astype(int) == y.fillna(0)).mean() >= 0.99:
                 suspects.append(col)
                 continue
-        if x.std() > 0 and y.std() > 0 and abs(x.corr(y)) >= 0.95:
+        if (pd.api.types.is_numeric_dtype(y) and x.std() > 0 and y.std() > 0
+                and abs(x.corr(y)) >= 0.95):
             suspects.append(col)
     return suspects
 
@@ -553,14 +613,18 @@ def page_modeling() -> None:
     col1, col2 = st.columns(2)
 
     with col1:
-        target_options = [c for c in df.columns if not pd.api.types.is_datetime64_any_dtype(df[c]) and c.lower() != "date"]
+        target_options = _target_columns(df)
+        if not target_options:
+            st.warning("Aucune colonne utilisable comme cible dans cette source.")
+            return
         binary_cols = [c for c in target_options if _is_binary(df[c])]
         default_target = binary_cols[-1] if binary_cols else target_options[-1]
         target_col = st.selectbox(
             "Colonne cible (risque)",
             options=target_options,
             index=target_options.index(default_target),
-            help="Par défaut, la dernière colonne 0/1 (événement observé). Les dates sont exclues.",
+            help="Par défaut, la dernière colonne 0/1 (événement observé). Dates, coordonnées et "
+                 "identifiants (zone, station) sont exclus.",
         )
         test_size = st.slider("Taille du jeu de test", min_value=0.1, max_value=0.5, value=0.2, step=0.05)
 
@@ -618,8 +682,9 @@ def page_modeling() -> None:
 
         model_name = st.selectbox(
             "Type de modèle",
-            options=["Random Forest", "Gradient Boosting", "Logistic Regression", "Linear Regression", "Decision Tree"],
+            options=list(model_comparison.get_available_models(effective_task, fast_mode).keys()),
             index=0,
+            key=f"single_model_{effective_task}_{fast_mode}",
         )
 
         if st.button("Entraîner le modèle"):
@@ -690,15 +755,13 @@ def page_modeling() -> None:
         st.subheader("Comparaison de modèles")
 
         # Obtenir les modèles disponibles
-        available_models = list(model_comparison.get_available_models(
-            detected_task if task_type == "auto" else task_type,
-            fast_mode
-        ).keys())
+        available_models = list(model_comparison.get_available_models(effective_task, fast_mode).keys())
 
         selected_models = st.multiselect(
             "Modèles à comparer",
             options=available_models,
-            default=available_models[:5] if len(available_models) >= 5 else available_models
+            default=available_models[:5],
+            key=f"compare_models_{effective_task}_{fast_mode}",
         )
 
         if st.button("Comparer les modèles"):
@@ -757,17 +820,23 @@ def page_modeling() -> None:
                             "feature_names": best_result.get("feature_names"),
                         }
                         st.session_state["clim_comparison_results"] = results
+                        st.session_state["clim_comparison_context"] = (target_col, tuple(feature_cols))
 
     # MODE 3 : Affiner le meilleur modèle
     elif modeling_mode == "Affiner le meilleur modèle":
         st.markdown("---")
         st.subheader("Affinage du meilleur modèle")
 
-        if "clim_comparison_results" not in st.session_state:
-            st.warning("Veuillez d'abord comparer des modèles pour identifier le meilleur.")
+        results = st.session_state.get("clim_comparison_results") or []
+        successful_results = [r for r in results if r.get("success")]
+        context = st.session_state.get("clim_comparison_context")
+        if not successful_results:
+            st.info("Lancez d'abord une comparaison de modèles (mode « Comparaison de modèles ») : "
+                    "l'affinage part du meilleur modèle trouvé.")
+        elif context and context != (target_col, tuple(feature_cols)):
+            st.info("La cible ou les variables ont changé depuis la dernière comparaison : "
+                    "relancez la comparaison avant d'affiner.")
         else:
-            results = st.session_state["clim_comparison_results"]
-            successful_results = [r for r in results if r["success"]]
             best_result = successful_results[max(range(len(successful_results)), key=lambda i: successful_results[i]["test_score"])]
 
             # Afficher le score de base avec contexte
@@ -779,8 +848,8 @@ def page_modeling() -> None:
             with col3:
                 st.metric("Temps", f"{best_result['training_time']:.2f}s")
 
-            st.success(f"Meilleur modèle de la comparaison (Score: {best_result['test_score']:.4f})")
-            st.info("Les hyperparamètres du meilleur modèle sont pré-remplis. Vous pouvez les modifier pour optimiser davantage.")
+            st.caption("Les hyperparamètres du meilleur modèle sont pré-remplis. Modifiez-les puis cliquez sur "
+                       "« Affiner le modèle » : le modèle affiné n'est conservé que s'il fait mieux sur le test.")
 
             st.markdown("---")
             st.markdown("**Hyperparamètres à affiner**")
@@ -848,9 +917,11 @@ def _train_tuned_model(df, target_col, task_type, test_size, use_cv, handle_imba
     elif improvement > 0:
         st.info(f"Légère amélioration : +{improvement:.4f}")
     else:
-        st.warning(f"Pas d'amélioration : {improvement:.4f}")
+        st.info(f"Pas d'amélioration sur le jeu de test (écart {improvement:+.4f}) : le modèle "
+                f"d'origine, {best_result['model_name']}, est conservé. Essayez d'autres valeurs.")
+        return
 
-    # Sauvegarder le modèle affiné
+    # Sauvegarder le modèle affiné (seulement s'il fait au moins aussi bien)
     st.session_state["clim_model"] = tuned_result["pipeline"]
     st.session_state["clim_model_info"] = {
         "task_type": task_type,
@@ -912,14 +983,11 @@ def page_pricing() -> None:
         st.warning("La tarification utilise la probabilité d'événement : entraînez un modèle de classification (cible 0/1).")
         return
 
-    df = _select_data_source("pricing")
+    required = list(dict.fromkeys((feature_cols or []) + [event_col]))
+    df = _select_data_source("pricing", required_cols=required)
     if df is None or df.empty:
-        st.warning("Veuillez d'abord charger des données.")
-        return
-    missing = [c for c in (feature_cols or []) + [event_col] if c not in df.columns]
-    if missing:
-        st.error("Ces colonnes du modèle sont absentes de la source choisie : " + ", ".join(missing)
-                 + ". Choisissez la même source que pour l'entraînement.")
+        st.warning("Aucune source chargée ne contient toutes les variables du modèle ("
+                   + ", ".join(required) + "). Réentraînez le modèle ou rechargez les mêmes données.")
         return
     df = df.dropna(subset=[event_col])
     if not _is_binary(df[event_col]):
