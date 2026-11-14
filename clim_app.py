@@ -17,17 +17,11 @@ from pathlib import Path
 import altair as alt
 import pandas as pd
 import streamlit as st
-from sklearn.ensemble import (
-    GradientBoostingClassifier,
-    GradientBoostingRegressor,
-    RandomForestClassifier,
-    RandomForestRegressor,
-)
 
-from climatool import data_loader, evaluation, maps, model_comparison, preprocessing, reporting
+from climatool import data_loader, evaluation, maps, model_comparison, preprocessing, reporting, tuning
 from climatool.data_utils import merge_dataframes
 
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 CSS_FILE = Path(__file__).parent / "climatool" / "assets" / "style.css"
 
 
@@ -56,11 +50,6 @@ def main() -> None:
             'project_framing': {},
             'data_sources': {}
         })
-
-    st.markdown(
-        '<div class="custom-header"><div class="logo">Data Tool Climatique</div></div>',
-        unsafe_allow_html=True,
-    )
 
     st.caption(f"Développé par Yacoubou KOUMAI - v{APP_VERSION}")
     st.title("Data Tool Climatique")
@@ -451,7 +440,13 @@ def page_modeling() -> None:
     col1, col2 = st.columns(2)
 
     with col1:
-        target_col = st.selectbox("Colonne cible (risque)", options=df.columns.tolist())
+        target_options = [c for c in df.columns if not pd.api.types.is_datetime64_any_dtype(df[c]) and c.lower() != "date"]
+        target_col = st.selectbox(
+            "Colonne cible (risque)",
+            options=target_options,
+            index=len(target_options) - 1,
+            help="Les colonnes de dates sont exclues ; la dernière colonne est proposée par défaut.",
+        )
         test_size = st.slider("Taille du jeu de test", min_value=0.1, max_value=0.5, value=0.2, step=0.05)
 
     with col2:
@@ -550,6 +545,9 @@ def page_modeling() -> None:
                         st.metric("Score Train", f"{result['train_score']:.4f}")
                     with col3:
                         st.metric("Temps", f"{result['training_time']:.2f}s")
+                else:
+                    error = results[0].get("error", "erreur inconnue") if results else "aucun résultat"
+                    st.error(f"L'entraînement a échoué : {error}")
 
     # MODE 2 : Comparaison de modèles
     elif modeling_mode == "Comparaison de modèles":
@@ -645,67 +643,17 @@ def page_modeling() -> None:
             st.markdown("---")
             st.markdown("**Hyperparamètres à affiner**")
 
-            # Affinage selon le type de modèle
-            if "Random Forest" in best_result["model_name"]:
-                # Extraire les hyperparamètres actuels du pipeline
-                current_model = best_result["pipeline"].named_steps.get("model")
-
-                # Valeurs par défaut (pré-remplies depuis le meilleur modèle)
-                default_n_estimators = getattr(current_model, 'n_estimators', 100)
-                default_max_depth = getattr(current_model, 'max_depth', None) or 10
-                default_min_samples_split = getattr(current_model, 'min_samples_split', 2)
-
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    n_estimators = st.slider("n_estimators", 50, 500, default_n_estimators, 50, key="tune_n_est")
-                with col2:
-                    max_depth = st.slider("max_depth", 3, 30, default_max_depth, 1, key="tune_max_depth")
-                with col3:
-                    min_samples_split = st.slider("min_samples_split", 2, 20, default_min_samples_split, 1, key="tune_min_split")
-
-                if st.button("Affiner le modèle"):
-                    task_type = (st.session_state.get("clim_model_info") or {}).get("task_type", detected_task)
-                    if task_type == "classification":
-                        tuned_model = RandomForestClassifier(
-                            n_estimators=n_estimators,
-                            max_depth=max_depth,
-                            min_samples_split=min_samples_split,
-                            random_state=42,
-                            n_jobs=-1,
-                            class_weight="balanced" if handle_imbalance else None
-                        )
-                    else:
-                        tuned_model = RandomForestRegressor(
-                            n_estimators=n_estimators,
-                            max_depth=max_depth,
-                            min_samples_split=min_samples_split,
-                            random_state=42,
-                            n_jobs=-1
-                        )
-
-                    _train_tuned_model(df, target_col, task_type, test_size, use_cv,
-                                       handle_imbalance, best_result, "Random Forest", tuned_model)
-
-            elif "Gradient Boosting" in best_result["model_name"]:
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    n_estimators = st.slider("n_estimators", 50, 500, 100, 50, key="tune_gb_n_est")
-                with col2:
-                    learning_rate = st.slider("learning_rate", 0.01, 0.3, 0.1, 0.01, key="tune_gb_lr")
-                with col3:
-                    max_depth = st.slider("max_depth", 3, 10, 3, 1, key="tune_gb_depth")
-
-                if st.button("Affiner le modèle"):
-                    task_type = (st.session_state.get("clim_model_info") or {}).get("task_type", detected_task)
-                    params = dict(n_estimators=n_estimators, learning_rate=learning_rate,
-                                  max_depth=max_depth, random_state=42)
-                    tuned_model = (GradientBoostingClassifier(**params) if task_type == "classification"
-                                   else GradientBoostingRegressor(**params))
-                    _train_tuned_model(df, target_col, task_type, test_size, use_cv,
-                                       handle_imbalance, best_result, "Gradient Boosting", tuned_model)
-
+            model_name = best_result["model_name"]
+            current_model = best_result["pipeline"].named_steps.get("model")
+            if current_model is None or not tuning.is_tunable(model_name):
+                st.info(f"{model_name} n'a pas d'hyperparamètre à affiner.")
             else:
-                st.info("L'affinage des hyperparamètres est disponible pour Random Forest et Gradient Boosting.")
+                values = tuning.tuning_widgets(model_name, current_model)
+                if st.button("Affiner le modèle"):
+                    task_type = (st.session_state.get("clim_model_info") or {}).get("task_type", detected_task)
+                    tuned_model = tuning.build_tuned_estimator(current_model, values)
+                    _train_tuned_model(df, target_col, task_type, test_size, use_cv,
+                                       handle_imbalance, best_result, model_name, tuned_model)
 
 
 def _train_tuned_model(df, target_col, task_type, test_size, use_cv, handle_imbalance, best_result, label, estimator) -> None:

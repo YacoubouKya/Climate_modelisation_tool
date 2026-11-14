@@ -6,6 +6,12 @@ exploration, prétraitement, modélisation, évaluation, cartographie et rapport
 
 Application en ligne : https://climateriskanalytics.streamlit.app/
 
+## Aperçu
+
+| Chargement | Modélisation | Évaluation |
+|---|---|---|
+| ![Chargement](docs/screenshots/01_chargement.png) | ![Modélisation](docs/screenshots/02_modelisation.png) | ![Évaluation](docs/screenshots/03_evaluation.png) |
+
 ## Fonctionnalités
 
 | Section | Contenu |
@@ -14,7 +20,7 @@ Application en ligne : https://climateriskanalytics.streamlit.app/
 | Chargement | Plusieurs fichiers CSV ou Excel étiquetés par type (climat, géographie, exposition, événements, autre), fusion automatique |
 | EDA climatique | Aperçu des données et série temporelle d'une variable |
 | Prétraitement | Conversion des dates, agrégation journalière ou mensuelle par identifiant, moyennes glissantes, détection d'anomalies |
-| Modélisation | Modèle unique, comparaison de modèles, affinage des hyperparamètres du meilleur modèle (Random Forest, Gradient Boosting) ; gestion du déséquilibre des classes, validation croisée, mode rapide |
+| Modélisation | Modèle unique, comparaison de modèles, affinage des hyperparamètres du meilleur modèle (tous les modèles qui en ont : forêts, boosting, arbre, KNN, régressions régularisées) ; gestion du déséquilibre des classes, validation croisée, mode rapide |
 | Évaluation | Classification : matrice de confusion, métriques détaillées, courbes précision-rappel et ROC. Régression : prédictions contre valeurs réelles, résidus, métriques orientées risque. Analyse par segment |
 | Cartographie | Heatmap, points, marqueurs regroupés (Folium) ou gradient 3D (PyDeck), plusieurs fonds de carte, filtre temporel |
 | Reporting | Rapport HTML personnalisable (sections, titre, variable climatique), aperçu intégré et téléchargement |
@@ -32,10 +38,12 @@ climatool/
     preprocessing.py        Prétraitement climatique
     model_utils.py          Détection du type de tâche, préprocesseur, importance des variables
     model_comparison.py     Entraînement et comparaison des modèles
+    tuning.py               Hyperparamètres ajustables lors de l'affinage
     evaluation.py           Évaluation du modèle
     maps.py                 Cartographie du risque
     reporting.py            Rapport HTML
-    assets/style.css        Thème visuel
+    assets/style.css        Thème visuel (couleurs de base dans .streamlit/config.toml)
+docs/screenshots/           Captures d'écran
 ```
 
 ## Installation locale
