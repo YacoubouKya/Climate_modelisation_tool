@@ -74,6 +74,16 @@ def segment_columns(X: pd.DataFrame) -> list[str]:
     return [c for c in cols if 1 < X[c].nunique() <= MAX_SEGMENTS]
 
 
+def _metric_card(label: str, value: float, subtitle: str, gradient: str) -> None:
+    st.markdown(f"""
+    <div style="text-align: center; padding: 15px; background: linear-gradient(135deg, {gradient}); border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+        <div style="font-size: 14px; color: #ffffff; margin-bottom: 8px; font-weight: 600;">{label}</div>
+        <div style="font-size: 28px; font-weight: bold; color: #ffffff;">{value:.4f}</div>
+        <div style="font-size: 12px; color: #ffffff; margin-top: 5px;">{subtitle}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
 def show_evaluation(info: dict) -> None:
     """Affiche l’évaluation à partir du dictionnaire retourné par clim_modeling.
 
@@ -84,63 +94,31 @@ def show_evaluation(info: dict) -> None:
     """
 
     task_type = info.get("task_type", "regression")
-    info.get("metric_name", "score")
     metric_value = info.get("metric_value", None)
     y_test = info.get("y_test")
     y_pred = info.get("y_pred")
 
     st.subheader("Résultats globaux")
 
-    # Afficher les 4 métriques principales selon le type de tâche avec un design amélioré
     if task_type == "classification":
-        col1, col2, col3, col4 = st.columns(4)
-
-        # Accuracy
-        with col1:
-            if metric_value is not None:
-                st.markdown(f"""
-                <div style="text-align: center; padding: 15px; background: linear-gradient(135deg, #434190 0%, #553C9A 100%); border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-                    <div style="font-size: 14px; color: #ffffff; margin-bottom: 8px; font-weight: 600;">ACCURACY</div>
-                    <div style="font-size: 28px; font-weight: bold; color: #ffffff;">{metric_value:.4f}</div>
-                    <div style="font-size: 12px; color: #ffffff; margin-top: 5px;">Performance globale</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-        # F1-Score
-        with col2:
-            f1_score = info.get("f1_score")
-            if f1_score is not None:
-                st.markdown(f"""
-                <div style="text-align: center; padding: 15px; background: linear-gradient(135deg, #97266D 0%, #9B2C2C 100%); border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-                    <div style="font-size: 14px; color: #ffffff; margin-bottom: 8px; font-weight: 600;">F1-SCORE</div>
-                    <div style="font-size: 28px; font-weight: bold; color: #ffffff;">{f1_score:.4f}</div>
-                    <div style="font-size: 12px; color: #ffffff; margin-top: 5px;">Balance précision/rappel</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-        # Precision
-        with col3:
-            precision = info.get("precision")
-            if precision is not None:
-                st.markdown(f"""
-                <div style="text-align: center; padding: 15px; background: linear-gradient(135deg, #2C5282 0%, #2A4365 100%); border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-                    <div style="font-size: 14px; color: #ffffff; margin-bottom: 8px; font-weight: 600;">PRECISION</div>
-                    <div style="font-size: 28px; font-weight: bold; color: #ffffff;">{precision:.4f}</div>
-                    <div style="font-size: 12px; color: #ffffff; margin-top: 5px;">Prédictions positives</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-        # Recall
-        with col4:
-            recall = info.get("recall")
-            if recall is not None:
-                st.markdown(f"""
-                <div style="text-align: center; padding: 15px; background: linear-gradient(135deg, #22543D 0%, #276749 100%); border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-                    <div style="font-size: 14px; color: #ffffff; margin-bottom: 8px; font-weight: 600;">RECALL</div>
-                    <div style="font-size: 28px; font-weight: bold; color: #ffffff;">{recall:.4f}</div>
-                    <div style="font-size: 12px; color: #ffffff; margin-top: 5px;">Détection positive</div>
-                </div>
-                """, unsafe_allow_html=True)
+        metric_name = info.get("metric_name") or "Score"
+        cards = [
+            (metric_name.upper(), metric_value, "Métrique principale", "#434190 0%, #553C9A 100%"),
+            ("AUC PRÉCISION-RAPPEL", info.get("pr_auc"), "Qualité sur l'événement rare", "#97266D 0%, #9B2C2C 100%"),
+            ("PRÉCISION", info.get("precision"), "Alertes justifiées", "#2C5282 0%, #2A4365 100%"),
+            ("RAPPEL", info.get("recall"), "Événements détectés", "#22543D 0%, #276749 100%"),
+        ]
+        if info.get("pr_auc") is None:
+            cards[1] = ("F1-SCORE", info.get("f1_score"), "Équilibre précision / rappel", "#97266D 0%, #9B2C2C 100%")
+        for col, (label, value, sub, gradient) in zip(st.columns(4), cards):
+            with col:
+                if value is not None:
+                    _metric_card(label, value, sub, gradient)
+        if info.get("accuracy") is not None and metric_name != "Accuracy":
+            st.caption(
+                f"Accuracy : {info['accuracy']:.4f}. Avec un événement rare, elle reste élevée même pour un "
+                "modèle qui ne prédit jamais l'événement : elle n'est donc pas la métrique de référence."
+            )
 
     else:  # Régression
         col1, col2, col3, col4 = st.columns(4)

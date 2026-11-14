@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import streamlit as st
+from sklearn.base import clone
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import (
     AdaBoostClassifier,
@@ -25,7 +26,17 @@ from sklearn.ensemble import (
     RandomForestRegressor,
 )
 from sklearn.linear_model import Lasso, LinearRegression, LogisticRegression, Ridge
-from sklearn.metrics import accuracy_score, f1_score, mean_squared_error, r2_score, precision_score, recall_score, mean_absolute_error
+from sklearn.metrics import (
+    accuracy_score,
+    average_precision_score,
+    f1_score,
+    mean_squared_error,
+    r2_score,
+    mean_absolute_error,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
 from sklearn.model_selection import cross_val_score, train_test_split
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
@@ -115,7 +126,7 @@ def train_and_evaluate_model(
 
     try:
         # Créer le pipeline
-        pipe = Pipeline([("preprocessor", preprocessor), ("model", model)])
+        pipe = Pipeline([("preprocessor", clone(preprocessor)), ("model", model)])
 
         # Entraîner
         pipe.fit(X_train, y_train)
@@ -133,19 +144,32 @@ def train_and_evaluate_model(
                 y_proba = None
 
         # Métriques
+        roc_auc = pr_auc = accuracy = None
         if task == "classification":
-            test_score = accuracy_score(y_test, y_pred)
-            train_score = accuracy_score(y_train, y_train_pred)
-            # Calculer toutes les métriques de classification
-            f1 = f1_score(y_test, y_pred, average="weighted", zero_division=0)
-            precision = precision_score(y_test, y_pred, average="weighted", zero_division=0)
-            recall = recall_score(y_test, y_pred, average="weighted", zero_division=0)
-            # Métriques de régression (initialisées à None)
-            mse = None
-            rmse = None
-            mae = None
-            r2 = None
-            metric_name = "Accuracy"
+            accuracy = accuracy_score(y_test, y_pred)
+            binary = y_train.nunique() == 2
+            average = "binary" if binary else "weighted"
+            f1 = f1_score(y_test, y_pred, average=average, zero_division=0)
+            precision = precision_score(y_test, y_pred, average=average, zero_division=0)
+            recall = recall_score(y_test, y_pred, average=average, zero_division=0)
+            # Métrique principale : AUC ROC (insensible au déséquilibre des classes),
+            # à défaut l'accuracy si le modèle ne fournit pas de probabilités.
+            if y_proba is not None and y_test.nunique() > 1:
+                if binary:
+                    roc_auc = roc_auc_score(y_test, y_proba[:, 1])
+                    pr_auc = average_precision_score(y_test, y_proba[:, 1])
+                    train_proba = pipe.predict_proba(X_train)[:, 1]
+                    train_score = roc_auc_score(y_train, train_proba)
+                else:
+                    roc_auc = roc_auc_score(y_test, y_proba, multi_class="ovr")
+                    train_score = roc_auc_score(y_train, pipe.predict_proba(X_train), multi_class="ovr")
+                test_score = roc_auc
+                metric_name = "AUC ROC"
+            else:
+                test_score = accuracy
+                train_score = accuracy_score(y_train, y_train_pred)
+                metric_name = "Accuracy"
+            mse = rmse = mae = r2 = None
         else:
             # Calculer toutes les métriques de régression
             mse = mean_squared_error(y_test, y_pred)
@@ -164,7 +188,10 @@ def train_and_evaluate_model(
         cv_scores = None
         if use_cv:
             try:
-                scoring = "accuracy" if task == "classification" else "r2"
+                if task == "classification":
+                    scoring = "roc_auc" if (metric_name == "AUC ROC" and y_train.nunique() == 2) else "accuracy"
+                else:
+                    scoring = "r2"
                 cv_scores = cross_val_score(
                     pipe, X_train, y_train, cv=cv_folds, scoring=scoring
                 )
@@ -188,6 +215,9 @@ def train_and_evaluate_model(
             "f1_score": f1,
             "precision": precision,
             "recall": recall,
+            "accuracy": accuracy,
+            "roc_auc": roc_auc,
+            "pr_auc": pr_auc,
             # Métriques de régression
             "mse": mse,
             "rmse": rmse,
@@ -281,15 +311,23 @@ def compare_models(
     cv_folds: int = 5,
     handle_imbalance: bool = False,
     custom_models: Dict[str, Any] | None = None,
+    feature_cols: List[str] | None = None,
+    time_col: str | None = None,
 ) -> Tuple[List[Dict[str, Any]], str]:
     """Compare plusieurs modèles ML avec validation robuste.
 
     custom_models permet d'entraîner des estimateurs déjà paramétrés
     (affinage des hyperparamètres) à la place de la liste standard.
+    feature_cols restreint les variables explicatives (pour écarter les fuites).
+    time_col active un découpage temporel : les observations les plus récentes
+    forment le jeu de test.
     """
 
     # Préparer les données
-    X = df.drop(columns=[target_col])
+    df = df.dropna(subset=[target_col])
+    if time_col:
+        df = df.assign(_t=pd.to_datetime(df[time_col], errors="coerce")).sort_values("_t").drop(columns="_t")
+    X = df[feature_cols] if feature_cols else df.drop(columns=[target_col])
     y = df[target_col]
 
     # Validation des données
@@ -328,19 +366,21 @@ def compare_models(
             use_cv = False
 
     # Split
-    try:
-        if task == "classification" and not handle_imbalance:
+    if time_col:
+        # Découpage temporel : on entraîne sur le passé, on teste sur la période la plus récente
+        n_test = max(1, int(round(len(X) * test_size)))
+        X_train, X_test = X.iloc[:-n_test], X.iloc[-n_test:]
+        y_train, y_test = y.iloc[:-n_test], y.iloc[-n_test:]
+    else:
+        try:
+            stratify = y if task == "classification" else None
             X_train, X_test, y_train, y_test = train_test_split(
-                X, y, test_size=test_size, random_state=42, stratify=y
+                X, y, test_size=test_size, random_state=42, stratify=stratify
             )
-        else:
+        except ValueError:
             X_train, X_test, y_train, y_test = train_test_split(
                 X, y, test_size=test_size, random_state=42
             )
-    except Exception:
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=test_size, random_state=42
-        )
 
     # Construire le preprocesseur
     preprocessor = build_preprocessor(X_train)
@@ -415,15 +455,18 @@ def display_comparison_results(results: List[Dict[str, Any]], task: str) -> Dict
     # Créer un DataFrame des résultats
     results_data = []
     for r in successful_results:
+        metric = r.get("metric_name") or "Score"
         row = {
             "Modèle": r["model_name"],
-            "Score Test": r["test_score"],
-            "Score Train": r["train_score"],
+            f"{metric} (test)": r["test_score"],
+            f"{metric} (apprentissage)": r["train_score"],
             "Temps (s)": r["training_time"],
         }
 
+        if task == "classification" and r.get("pr_auc") is not None:
+            row["AUC PR (test)"] = r["pr_auc"]
         if task == "classification" and r["f1_score"] is not None:
-            row["F1-Score"] = r["f1_score"]
+            row["F1 (test)"] = r["f1_score"]
         elif task == "regression" and r["rmse"] is not None:
             row["RMSE"] = r["rmse"]
 
@@ -434,7 +477,8 @@ def display_comparison_results(results: List[Dict[str, Any]], task: str) -> Dict
         results_data.append(row)
 
     results_df = pd.DataFrame(results_data)
-    results_df = results_df.sort_values("Score Test", ascending=False).reset_index(drop=True)
+    test_col = next(c for c in results_df.columns if c.endswith("(test)"))
+    results_df = results_df.sort_values(test_col, ascending=False).reset_index(drop=True)
 
     # Identifier le meilleur modèle
     best_result = successful_results[np.argmax([r["test_score"] for r in successful_results])]
@@ -448,13 +492,8 @@ def display_comparison_results(results: List[Dict[str, Any]], task: str) -> Dict
     # Afficher le tableau
     st.subheader("Tableau de comparaison")
     st.dataframe(results_df.style.format({
-        "Score Test": "{:.4f}",
-        "Score Train": "{:.4f}",
+        **{c: "{:.4f}" for c in results_df.columns if c not in ("Modèle", "Temps (s)")},
         "Temps (s)": "{:.2f}",
-        "F1-Score": "{:.4f}" if "F1-Score" in results_df.columns else None,
-        "RMSE": "{:.4f}" if "RMSE" in results_df.columns else None,
-        "CV Mean": "{:.4f}" if "CV Mean" in results_df.columns else None,
-        "CV Std": "{:.4f}" if "CV Std" in results_df.columns else None,
     }), width="stretch")
 
     # Graphiques de comparaison
@@ -468,7 +507,7 @@ def display_comparison_results(results: List[Dict[str, Any]], task: str) -> Dict
         fig1, ax1 = plt.subplots(figsize=(8, 5))
         colors = ['#2ecc71' if model == best_result['model_name'] else '#3498db'
                   for model in results_df["Modèle"]]
-        ax1.barh(results_df["Modèle"], results_df["Score Test"], color=colors)
+        ax1.barh(results_df["Modèle"], results_df[test_col], color=colors)
         ax1.set_xlabel(best_result['metric_name'])
         ax1.set_title(f"Comparaison - {best_result['metric_name']}")
         ax1.grid(axis='x', alpha=0.3)
